@@ -12,7 +12,7 @@ class ImageFolderDataset(torch.utils.data.Dataset):
         if not os.path.exists(self.img_folder):
             load_dataset(url, self.img_folder + ".zip")
         self.transform = transform
-        self.all_imgs = os.listdir(os.path.join(img_folder, self.part))
+        self.all_imgs = os.listdir(os.path.join(img_folder, part))
 
     def __len__(self):
         return len(self.all_imgs)

@@ -5,10 +5,8 @@ from collections import OrderedDict
 
 
 class ConfigParser:
-    def __init__(self, filepath):
-        json_file = open(filepath, "r")
-        self._config = json.load(json_file)
-        json_file.close()
+    def __init__(self, config):
+        self._config = config
 
         save_dir = Path(self.config["trainer"]["save_dir"])
 

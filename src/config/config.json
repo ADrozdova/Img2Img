@@ -41,7 +41,7 @@
     }
   },
   "loss": {
-    "type": "FastSpeechLoss",
+    "type": "CycleGanLoss",
     "args": {
       "adversarial": "True"
     },

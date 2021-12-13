@@ -38,17 +38,17 @@ def get_dataloaders(config):
                                                                 pin_memory=True,
                                                                 num_workers=8, )
 
-    dataloaders['val_loader'] = torch.utils.data.DataLoader(dataset=val_set_A,
-                                                            batch_size=params['batch_size_val'],
-                                                            shuffle=True,
-                                                            pin_memory=True,
-                                                            num_workers=8, )
+    dataloaders['val_loader_A'] = torch.utils.data.DataLoader(dataset=val_set_A,
+                                                              batch_size=params['batch_size_val'],
+                                                              shuffle=True,
+                                                              pin_memory=True,
+                                                              num_workers=8, )
 
-    dataloaders['val_loader'] = torch.utils.data.DataLoader(dataset=val_set_B,
-                                                            batch_size=params['batch_size_val'],
-                                                            shuffle=True,
-                                                            pin_memory=True,
-                                                            num_workers=8, )
+    dataloaders['val_loader_B'] = torch.utils.data.DataLoader(dataset=val_set_B,
+                                                              batch_size=params['batch_size_val'],
+                                                              shuffle=True,
+                                                              pin_memory=True,
+                                                              num_workers=8, )
 
     return dataloaders
 

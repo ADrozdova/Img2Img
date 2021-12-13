@@ -1,24 +1,13 @@
-import random
-from random import shuffle
 import itertools
 
-import PIL
+import numpy as np
 import torch
-import torch.nn.functional as F
-from torch.nn.utils import clip_grad_norm_
-from torchvision.transforms import ToTensor
 from tqdm import tqdm
-from src.aligner.grapheme_aligner import GraphemeAligner
-from src.aligner.aligner import Aligner
-
-from src.base import BaseTrainer
-from src.logger.utils import plot_spectrogram_to_buf
-from src.utils import inf_loop, MetricTracker
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-class Trainer(BaseTrainer):
+class Trainer():
     def __init__(
             self,
             gen_B,
@@ -26,43 +15,54 @@ class Trainer(BaseTrainer):
             disc_A,
             disc_B,
             criterion,
-            optimizer,
+            optimizer_G,
+            optimizer_DA,
+            optimizer_DB,
             config,
             device,
-            data_loader,
-            valid_data_loader=None,
+            data_loader_A,
+            data_loader_B,
+            valid_data_loader_A=None,
+            valid_data_loader_B=None,
             lr_scheduler=None,
             len_epoch=None,
             skip_oom=True,
     ):
-        super().__init__(gen_B, gen_A, disc_A, disc_B, criterion, optimizer, config, device)
+        super().__init__(gen_B, gen_A, disc_A, disc_B, criterion, optimizer_G, optimizer_DA, optimizer_DB,
+                         config, device)
 
         self.gen_B = gen_B
         self.gen_A = gen_A
         self.disc_A = disc_A
         self.disc_B = disc_B
 
+        self.device = device
+        self.config = config
+
+        self.criterion = criterion
+        self.optimizer_G = optimizer_G
+        self.optimizer_DA = optimizer_DA
+        self.optimizer_DB = optimizer_DB
+
         self.skip_oom = skip_oom
         self.config = config
-        self.data_loader = data_loader
-        if len_epoch is None:
-            # epoch-based training
-            self.len_epoch = len(self.data_loader)
-        else:
-            # iteration-based training
-            self.data_loader = inf_loop(data_loader)
-            self.len_epoch = len_epoch
-        self.valid_data_loader = valid_data_loader
-        self.do_validation = self.valid_data_loader is not None
+
+        self.data_loader_A = data_loader_A
+        self.data_loader_B = data_loader_B
+        self.valid_data_loader_A = valid_data_loader_A
+        self.valid_data_loader_B = valid_data_loader_B
+
+        self.len_epoch = len(self.data_loader_A)
+
+        self.do_validation = self.valid_data_loader_A is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = 10
+        self.start_epoch = 1
 
-        self.train_metrics = MetricTracker(
-            "gan loss", "cycle loss", "id loss", "grad norm"
-        )
-        self.valid_metrics = MetricTracker(
-            "gan loss", "cycle loss", "id loss"
-        )
+        self.epochs = config["trainer"]["epochs"]
+        self.save_period = config["trainer"]["save_period"]
+        self.checkpoint_dir = config.save_dir
+
 
     @staticmethod
     def move_batch_to_device(batch, device: torch.device):
@@ -75,16 +75,19 @@ class Trainer(BaseTrainer):
         self.disc_A.train()
         self.disc_B.train()
 
-        self.train_metrics.reset()
+        gen_loss, discr_A_loss, discr_B_loss = [], [], []
+
         for batch_idx, batch in enumerate(
-                tqdm(self.data_loader, desc="train", total=self.len_epoch)
+                tqdm(zip(self.data_loader_A, self.data_loader_B), desc="train", total=self.len_epoch)
         ):
             try:
-                batch = self.process_batch(
+                gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
                     batch,
                     is_train=True,
-                    metrics=self.train_metrics,
                 )
+                gen_loss.append(gen_loss_i)
+                discr_A_loss.append(discr_A_loss_i)
+                discr_B_loss.append(discr_B_loss_i)
             except RuntimeError as e:
                 if "out of memory" in str(e) and self.skip_oom:
                     for p in itertools.chain(self.gen_B.parameters(), self.gen_A.parameters(),
@@ -95,29 +98,55 @@ class Trainer(BaseTrainer):
                     continue
                 else:
                     raise e
-            self.train_metrics.update("grad norm", self.get_grad_norm())
-            if batch_idx % self.log_step == 0:
 
-                self._log_spectrogram_audio(batch.melspec, batch.melspec_pred, batch.waveform, batch.melspec_pred)
-                self._log_scalars(self.train_metrics)
             if batch_idx >= self.len_epoch:
                 break
-        log = self.train_metrics.result()
+        return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
 
-        if self.do_validation:
-            val_log = self._valid_epoch(epoch)
-            log.update(**{"val_" + k: v for k, v in val_log.items()})
+    def process_batch(self, batch, is_train: bool):
+        real_A, real_B = batch
+        real_A = real_A.to(device)
+        real_B = real_B.to(device)
 
-        return log
+        fake_B = self.gen_B(real_A)
+        recon_A = self.gen_A(fake_B)
 
-    def process_batch(self, batch, is_train: bool, metrics: MetricTracker):
+        fake_A = self.gen_A(real_B)
+        recon_B = self.gen_B(fake_A)
 
+        id_A = self.gen_A(real_A)
+        id_B = self.gen_B(real_B)
 
-        # metrics.update("loss", loss.item())
-        # metrics.update("mel loss", mel_loss.item())
-        # metrics.update("duration loss", duration_loss.item())
+        if self.criterion.adversarial:
+            disc_real_A = self.disc_A(real_A)
+            disc_fake_A = self.disc_A(fake_A)
 
-        return batch
+            disc_real_B = self.disc_A(real_B)
+            disc_fake_B = self.disc_A(fake_B)
+        else:
+            disc_real_A, disc_fake_A, disc_real_B, disc_fake_B = None, None, None, None
+
+        id_A_loss, cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(id_A, recon_A, real_A, disc_real_A,
+                                                                           disc_fake_A)
+        id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(id_B, recon_B, real_B, disc_real_B,
+                                                                           disc_fake_B)
+
+        gen_loss = (gen_A_loss + gen_B_loss + (id_A_loss + id_B_loss) + (cycle_A_loss + cycle_B_loss)) * 0.5
+
+        if is_train:
+            self.optimizer_G.zero_grad()
+            self.optimizer_DA.zero_grad()
+            self.optimizer_DB.zero_grad()
+
+            gen_loss.backward()
+            discr_A_loss.backward()
+            discr_B_loss.backward()
+
+            self.optimizer_G.step()
+            self.optimizer_DA.step()
+            self.optimizer_DB.step()
+
+        return gen_loss, discr_A_loss, discr_B_loss
 
     def _valid_epoch(self, epoch):
         self.gen_B.eval()
@@ -125,27 +154,64 @@ class Trainer(BaseTrainer):
         self.disc_A.eval()
         self.disc_B.eval()
 
-        self.valid_metrics.reset()
+        gen_loss, discr_A_loss, discr_B_loss = [], [], []
+
         with torch.no_grad():
-            for batch_idx, batch in tqdm(
-                    enumerate(self.valid_data_loader),
-                    desc="validation",
-                    total=len(self.valid_data_loader),
+            for batch_idx, batch in enumerate(
+                    tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_A), desc="train",
+                         total=len(self.valid_data_loader_A))
             ):
-                batch = self.process_batch(
+                gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
                     batch,
                     is_train=False,
-                    metrics=self.valid_metrics,
                 )
+                gen_loss.append(gen_loss_i)
+                discr_A_loss.append(discr_A_loss_i)
+                discr_B_loss.append(discr_B_loss_i)
 
-        return self.valid_metrics.result()
+        return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
 
-    def _progress(self, batch_idx):
-        base = "[{}/{} ({:.0f}%)]"
-        if hasattr(self.data_loader, "n_samples"):
-            current = batch_idx * self.data_loader.batch_size
-            total = self.data_loader.n_samples
-        else:
-            current = batch_idx
-            total = self.len_epoch
-        return base.format(current, total, 100.0 * current / total)
+    def train(self):
+        try:
+            self._train_process()
+        except KeyboardInterrupt as e:
+            self._save_checkpoint(self._last_epoch, save_best=False)
+            raise e
+
+    def _train_process(self):
+        gen_loss, discr_A_loss, discr_B_loss = [], [], []
+
+        for epoch in range(self.start_epoch, self.epochs + 1):
+            self._last_epoch = epoch
+            gen_loss_i, discr_A_loss_i, discr_B_loss_i = self._train_epoch(epoch)
+
+            gen_loss.append(gen_loss_i)
+            discr_A_loss.append(discr_A_loss_i)
+            discr_B_loss.append(discr_B_loss_i)
+
+            if (epoch + 1) % self.save_period == 0:
+                self._save_checkpoint(epoch)
+
+    def _save_checkpoint(self, epoch, save_best=False, only_best=False):
+        arch_g = type(self.gen_B).__name__
+        arch_d = type(self.disc_A).__name__
+
+        state = {
+            "arch_g": arch_g,
+            "arch_d": arch_d,
+            "epoch": epoch,
+            "state_dict_gen_a": self.gen_A.state_dict(),
+            "state_dict_gen_b": self.gen_B.state_dict(),
+            "state_dict_discr_a": self.disc_A.state_dict(),
+            "state_dict_disrc_b": self.disc_B.state_dict(),
+            "optimizer_G": self.optimizer_G.state_dict(),
+            "optimizer_DA": self.optimizer_DA.state_dict(),
+            "optimizer_DB": self.optimizer_DB.state_dict(),
+            "config": self.config,
+        }
+        filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
+        if not (only_best and save_best):
+            torch.save(state, filename)
+        if save_best:
+            best_path = str(self.checkpoint_dir / "model_best.pth")
+            torch.save(state, best_path)

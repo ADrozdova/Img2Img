@@ -28,7 +28,7 @@ def main(config):
     dataloaders = get_dataloaders(config)
 
     # build model architecture, then print to console
-    gen_B= config.init_obj(config["Generator"], module_arch)
+    gen_B = config.init_obj(config["Generator"], module_arch)
     gen_A = config.init_obj(config["Generator"], module_arch)
 
     disc_A = config.init_obj(config["Discriminator"], module_arch)
@@ -50,12 +50,15 @@ def main(config):
 
     loss_module = config.init_obj(config["loss"], module_loss).to(device)
 
-    # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
-    trainable_params = filter(lambda p: p.requires_grad, itertools.chain(gen_B.parameters(), gen_A.parameters(),
-                                                                         disc_A.parameters(), disc_B.parameters()))
-    optimizer = config.init_obj(config["optimizer"], torch.optim, trainable_params)
-    # lr_scheduler = config.init_obj(config["lr_scheduler"], torch.optim.lr_scheduler, optimizer)
+    trainable_params = filter(lambda p: p.requires_grad, itertools.chain(gen_A.parameters(), gen_B.parameters()))
+    optimizer_G = config.init_obj(config["optimizer"], torch.optim, trainable_params)
 
+    trainable_params = filter(lambda p: p.requires_grad, disc_A.parameters())
+    optimizer_DA = config.init_obj(config["optimizer"], torch.optim, trainable_params)
+
+    trainable_params = filter(lambda p: p.requires_grad, disc_B.parameters())
+    optimizer_DB = config.init_obj(config["optimizer"], torch.optim, trainable_params)
+    # lr_scheduler = config.init_obj(config["lr_scheduler"], torch.optim.lr_scheduler, optimizer)
 
     trainer = Trainer(
         gen_B,
@@ -63,11 +66,15 @@ def main(config):
         disc_A,
         disc_B,
         loss_module,
-        optimizer,
+        optimizer_G,
+        optimizer_DA,
+        optimizer_DB,
         config=config,
         device=device,
-        data_loader=dataloaders["train"],
-        valid_data_loader=dataloaders["val"],
+        data_loader_A=dataloaders["train_loader_A"],
+        data_loader_B=dataloaders["train_loader_B"],
+        valid_data_loader_A=dataloaders["val"],
+        valid_data_loader_B=dataloaders["val"],
         len_epoch=config["trainer"].get("len_epoch", None)
     )
 

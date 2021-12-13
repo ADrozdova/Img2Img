@@ -8,7 +8,8 @@ class CycleGanLoss(nn.Module):
         self.criterion_cycle = nn.L1Loss()
         self.criterion_id = nn.L1Loss()
         self.adv_loss = None
-        if adversarial == "True":
+        self.adversarial = (adversarial == "True")
+        if self.adversarial:
             self.adv_loss = AdvLoss()
 
     def forward(self, id_img, recon_img, real_img, discr_real_out=None, discr_fake_out=None):

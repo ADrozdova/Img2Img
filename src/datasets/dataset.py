@@ -3,8 +3,7 @@ import os
 import torch
 import torchvision
 from PIL import Image
-from torchvision import transforms
-from .utils import load_dataset
+from src.utils.util import load_dataset
 
 
 class ImageFolderDataset(torch.utils.data.Dataset):

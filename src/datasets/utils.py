@@ -1,8 +1,5 @@
-import os
-
 import torch
-import subprocess
-import zipfile
+
 from .dataset import ImageFolderDataset
 
 
@@ -53,15 +50,4 @@ def get_dataloaders(config):
     return dataloaders
 
 
-def load_dataset(url, zipname):
-    if url is None:
-        raise RuntimeError("Can't load dataset with None url")
 
-    subprocess.run(
-        ["wget", url, "-O", zipname],
-    )
-
-    with zipfile.ZipFile(zipname, 'r') as zip_ref:
-        zip_ref.extractall(".")
-
-    os.remove(zipname)

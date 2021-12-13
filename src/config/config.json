@@ -1,0 +1,56 @@
+{
+  "name": "default_config",
+  "n_gpu": 1,
+  "preprocessing": {
+  },
+  "generator": {
+    "type": "Generator",
+    "args": {
+      "in_size": 3,
+      "n_filter": 64,
+      "n_blocks": 4,
+      "enc_kernels": [7, 3, 3],
+      "enc_stride": 1,
+      "enc_padding": [0, 1, 1],
+      "dec_kernels": [3, 3],
+      "dec_stride": 2,
+      "dec_padding": [1, 1]
+    }
+  },
+  "discriminator": {
+    "type": "Discriminator",
+    "args": {
+      "channels": [3, 64, 128, 256, 512],
+      "kernel_sz": 4,
+      "padding": 1
+    }
+  },
+  "dataset": {
+    "img_folder": "facades",
+    "url": "http://efrosgans.eecs.berkeley.edu/cyclegan/datasets/facades.zip",
+    "parts_train": ["trainA", "trainB"],
+    "parts_val": ["testA", "testB"]
+  },
+  "optimizer": {
+    "type": "AdamW",
+    "args": {
+      "lr": 3e-4,
+      "betas": [0.9, 0.999]
+    }
+  },
+  "loss": {
+    "type": "FastSpeechLoss",
+    "args": {
+      "adversarial": "True"
+    }
+  },
+  "trainer": {
+    "epochs": 40,
+    "len_epoch": 300,
+    "save_dir": "saved/",
+    "save_period": 10,
+    "verbosity": 2,
+    "monitor": "min val_loss",
+    "early_stop": 100
+  }
+}

@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from collections import OrderedDict
 
 
 class ConfigParser:
@@ -48,8 +49,8 @@ class ConfigParser:
 
         cfg_fname = Path(args.config)
 
-        json_file = open(cfg_fname, "r")
-        config = json.load(json_file)
+        json_file = open(Path(cfg_fname), "r")
+        config = json.load(json_file, object_hook=OrderedDict)
         json_file.close()
 
         return cls(config)

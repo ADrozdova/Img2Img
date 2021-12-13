@@ -6,8 +6,8 @@ from .dataset import ImageFolderDataset
 def get_dataloaders(config):
     params = config["dataset"]
 
-    train_set_A = ImageFolderDataset(params['img_folder'], params['url'], params['parts_train'][0])
-    train_set_B = ImageFolderDataset(params['img_folder'], params['url'], params['parts_train'][1])
+    train_set_A = ImageFolderDataset(params['img_folder'], params['parts_train'][0], params['url'])
+    train_set_B = ImageFolderDataset(params['img_folder'], params['parts_train'][1], params['url'])
 
     if 'parts_val' not in params:
         train_size = int(len(train_set_A) * 0.8)

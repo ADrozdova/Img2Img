@@ -6,8 +6,8 @@ from .dataset import ImageFolderDataset
 def get_dataloaders(config):
     params = config["dataset"]
 
-    train_set_A = ImageFolderDataset(params['img_folder'], params['parts_train'][0], params['url'])
-    train_set_B = ImageFolderDataset(params['img_folder'], params['parts_train'][1], params['url'])
+    train_set_A = ImageFolderDataset(params['img_folder'], params['parts_train'][0], url=params['url'])
+    train_set_B = ImageFolderDataset(params['img_folder'], params['parts_train'][1], url=params['url'])
 
     if 'parts_val' not in params:
         train_size = int(len(train_set_A) * 0.8)
@@ -19,8 +19,8 @@ def get_dataloaders(config):
         train_set_B, val_set_B = torch.utils.data.random_split(train_set_B, [train_size, len(train_set_B) - train_size])
 
     else:
-        val_set_A = ImageFolderDataset(params['img_folder'], params['url'], params['parts_val'][0])
-        val_set_B = ImageFolderDataset(params['img_folder'], params['url'], params['parts_val'][1])
+        val_set_A = ImageFolderDataset(params['img_folder'], params['parts_val'][0], url=params['url'])
+        val_set_B = ImageFolderDataset(params['img_folder'], params['parts_val'][1], url=params['url'])
 
     dataloaders = dict()
     dataloaders["train_loader_A"] = torch.utils.data.DataLoader(dataset=train_set_A,

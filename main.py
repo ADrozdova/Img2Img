@@ -28,11 +28,11 @@ def main(config):
     dataloaders = get_dataloaders(config)
 
     # build model architecture, then print to console
-    gen_B = config.init_obj(config["Generator"], module_arch)
-    gen_A = config.init_obj(config["Generator"], module_arch)
+    gen_B = config.init_obj(config["generator"], module_arch)
+    gen_A = config.init_obj(config["generator"], module_arch)
 
-    disc_A = config.init_obj(config["Discriminator"], module_arch)
-    disc_B = config.init_obj(config["Discriminator"], module_arch)
+    disc_A = config.init_obj(config["discriminator"], module_arch)
+    disc_B = config.init_obj(config["discriminator"], module_arch)
 
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config["n_gpu"])

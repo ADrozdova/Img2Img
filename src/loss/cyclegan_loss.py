@@ -4,7 +4,7 @@ from torch import nn
 
 class CycleGanLoss(nn.Module):
     def __init__(self, adversarial="True"):
-        super(CycleGanLoss).__init__()
+        super(CycleGanLoss, self).__init__()
         self.criterion_cycle = nn.L1Loss()
         self.criterion_id = nn.L1Loss()
         self.adv_loss = None

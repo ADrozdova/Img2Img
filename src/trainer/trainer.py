@@ -264,7 +264,7 @@ class Trainer():
             torch.save(state, best_path)
 
     def _log_img(self, name, image):
-        img = image.detach().cpu()
+        img = image[0].permute(1, 2, 0).detach().cpu()
         img = PIL.Image.open(self._plot_img_to_buf(img))
         wandb.log({
             name: wandb.Image(img)
@@ -272,7 +272,7 @@ class Trainer():
 
     def _plot_img_to_buf(self, img_tensor, name=None):
         plt.figure(figsize=(20, 20))
-        plt.imshow((img_tensor.permute(1, 2, 0).numpy() * 255).astype('uint8'))
+        plt.imshow((img_tensor.numpy() * 255).astype('uint8'))
         plt.title(name)
         buf = io.BytesIO()
         plt.savefig(buf, format='png')

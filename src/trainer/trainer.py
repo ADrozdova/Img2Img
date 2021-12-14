@@ -89,7 +89,7 @@ class Trainer():
 
                 wandb.log({"generator loss train": gen_loss_i,
                            "discriminator A loss train": discr_A_loss_i,
-                           "discriminator B loss train": discr_B_loss})
+                           "discriminator B loss train": discr_B_loss_i})
 
             except RuntimeError as e:
                 if "out of memory" in str(e) and self.skip_oom:

@@ -235,6 +235,9 @@ class Trainer():
 
             gen_loss.append(gen_loss_i)
 
+            if len(gen_loss) > 1 and gen_loss[-1] < gen_loss[-2]:
+                self._save_checkpoint(epoch, save_best=True)
+
             if self.criterion.adversarial:
                 discr_A_loss.append(discr_A_loss_i)
                 discr_B_loss.append(discr_B_loss_i)

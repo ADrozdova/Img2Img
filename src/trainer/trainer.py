@@ -126,18 +126,20 @@ class Trainer():
         id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(id_B, recon_B, real_B, disc_real_B,
                                                                            disc_fake_B)
 
-        gen_loss = (gen_A_loss + gen_B_loss + (id_A_loss + id_B_loss) + (cycle_A_loss + cycle_B_loss)) * 0.5
+        gen_loss = (gen_A_loss + gen_B_loss + self.config["loss"]["lambda_id"] * (id_A_loss + id_B_loss) +
+                    self.config["loss"]["lambda_cyc"] * (cycle_A_loss + cycle_B_loss)) * 0.5
 
         if is_train:
             self.optimizer_G.zero_grad()
+            gen_loss.backward()
+            self.optimizer_G.step()
+
             self.optimizer_DA.zero_grad()
             self.optimizer_DB.zero_grad()
 
-            gen_loss.backward()
             discr_A_loss.backward()
             discr_B_loss.backward()
 
-            self.optimizer_G.step()
             self.optimizer_DA.step()
             self.optimizer_DB.step()
 

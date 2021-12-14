@@ -151,7 +151,7 @@ class Trainer():
                 self.optimizer_DA.step()
                 self.optimizer_DB.step()
 
-        return gen_loss, discr_A_loss, discr_B_loss
+        return gen_loss.item(), discr_A_loss.item(), discr_B_loss.item()
 
     def _valid_epoch(self, epoch):
         self.gen_B.eval()

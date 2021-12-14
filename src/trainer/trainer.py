@@ -4,8 +4,6 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 class Trainer():
     def __init__(
@@ -27,9 +25,6 @@ class Trainer():
             lr_scheduler=None,
             skip_oom=True,
     ):
-        super().__init__(gen_B, gen_A, disc_A, disc_B, criterion, optimizer_G, optimizer_DA, optimizer_DB,
-                         config, device)
-
         self.gen_B = gen_B
         self.gen_A = gen_A
         self.disc_A = disc_A

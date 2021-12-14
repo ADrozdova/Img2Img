@@ -1,9 +1,12 @@
+import io
 import itertools
 
+import PIL
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from tqdm import tqdm
 import wandb
+from tqdm import tqdm
 
 
 class Trainer():
@@ -120,6 +123,13 @@ class Trainer():
         id_A = self.gen_A(real_A)
         id_B = self.gen_B(real_B)
 
+        name = "train" if is_train else "valid"
+
+        self._log_img("real A " + name, real_A)
+        self._log_img("real B " + name, real_B)
+        self._log_img("fake A " + name, fake_A)
+        self._log_img("fake B " + name, fake_B)
+
         if self.criterion.adversarial:
             disc_real_A = self.disc_A(real_A)
             disc_fake_A = self.disc_A(fake_A)
@@ -177,7 +187,7 @@ class Trainer():
 
         with torch.no_grad():
             for batch_idx, batch in enumerate(
-                    tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_A), desc="train",
+                    tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_A), desc="valid",
                          total=len(self.valid_data_loader_A))
             ):
                 gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
@@ -214,7 +224,7 @@ class Trainer():
             if self.criterion.adversarial:
                 wandb.log({"generator loss valid": gen_loss_i,
                            "discriminator A loss valid": discr_A_loss_i,
-                           "discriminator B loss valid": discr_B_loss,
+                           "discriminator B loss valid": discr_B_loss_i,
                            "epoch": epoch})
             else:
                 wandb.log({"generator loss valid": gen_loss_i,
@@ -252,3 +262,19 @@ class Trainer():
         if save_best:
             best_path = str(self.checkpoint_dir / "model_best.pth")
             torch.save(state, best_path)
+
+    def _log_img(self, name, image):
+        img = image.detach().cpu()
+        img = PIL.Image.open(self._plot_img_to_buf(img))
+        wandb.log({
+            name: wandb.Image(img)
+        })
+
+    def _plot_img_to_buf(img_tensor, name=None):
+        plt.figure(figsize=(20, 20))
+        plt.imshow((img_tensor.permute(1, 2, 0).numpy() * 255).astype('uint8'))
+        plt.title(name)
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        return buf

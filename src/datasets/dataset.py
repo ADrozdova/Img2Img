@@ -12,13 +12,14 @@ class ImageFolderDataset(torch.utils.data.Dataset):
         if not os.path.exists(self.img_folder):
             load_dataset(url, self.img_folder + ".zip")
         self.transform = transform
-        self.all_imgs = os.listdir(os.path.join(img_folder, part))
+        self.part = part
+        self.all_imgs = os.listdir(os.path.join(img_folder, self.part))
 
     def __len__(self):
         return len(self.all_imgs)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_folder, self.all_imgs[idx])
+        img_path = os.path.join(self.img_folder, self.part , self.all_imgs[idx])
         image = torchvision.transforms.ToTensor()(Image.open(img_path))
         if self.transform:
             image = self.transform(image)

@@ -131,7 +131,7 @@ class Trainer():
 
         if is_train:
             self.optimizer_G.zero_grad()
-            gen_loss.backward(retain_graph=True)
+            gen_loss.backward()
             self.optimizer_G.step()
 
             self.optimizer_DA.zero_grad()

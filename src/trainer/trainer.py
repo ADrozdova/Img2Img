@@ -98,8 +98,9 @@ class Trainer():
         return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
 
     def process_batch(self, batch, is_train: bool):
-        batch = self.move_batch_to_device(batch, self.device)
         real_A, real_B = batch
+        real_A = self.move_batch_to_device(real_A, self.device)
+        real_B = self.move_batch_to_device(real_B, self.device)
 
         fake_B = self.gen_B(real_A)
         recon_A = self.gen_A(fake_B)

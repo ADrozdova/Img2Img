@@ -272,6 +272,7 @@ class Trainer():
         wandb.log({
             name: wandb.Image(img)
         })
+        img.close()
 
     def _plot_img_to_buf(self, img_tensor, name=None):
         plt.figure(figsize=(20, 20))

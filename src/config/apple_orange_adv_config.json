@@ -26,9 +26,10 @@
     }
   },
   "dataset": {
-    "img_folder": "grumpifycat",
-    "url": "http://efrosgans.eecs.berkeley.edu/cyclegan/datasets/grumpifycat.zip",
+    "img_folder": "apple2orange",
+    "url": "http://efrosgans.eecs.berkeley.edu/cyclegan/datasets/apple2orange.zip",
     "parts_train": ["trainA", "trainB"],
+    "parts_val": ["testA", "testB"],
     "batch_size_train": 2,
     "batch_size_val": 16
   },

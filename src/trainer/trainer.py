@@ -85,6 +85,7 @@ class Trainer():
                 gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
                     batch,
                     is_train=True,
+                    log=(batch_idx % 10 == 0)
                 )
                 gen_loss.append(gen_loss_i)
                 discr_A_loss.append(discr_A_loss_i)
@@ -109,7 +110,7 @@ class Trainer():
                 break
         return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
 
-    def process_batch(self, batch, is_train: bool):
+    def process_batch(self, batch, is_train: bool, log=False):
         real_A, real_B = batch
         real_A = self.move_batch_to_device(real_A, self.device)
         real_B = self.move_batch_to_device(real_B, self.device)
@@ -125,10 +126,11 @@ class Trainer():
 
         name = "train" if is_train else "valid"
 
-        self._log_img("real A " + name, real_A)
-        self._log_img("real B " + name, real_B)
-        self._log_img("fake A " + name, fake_A)
-        self._log_img("fake B " + name, fake_B)
+        if log:
+            self._log_img("real A " + name, real_A)
+            self._log_img("real B " + name, real_B)
+            self._log_img("fake A " + name, fake_A)
+            self._log_img("fake B " + name, fake_B)
 
         if self.criterion.adversarial:
             disc_real_A = self.disc_A(real_A)
@@ -193,6 +195,7 @@ class Trainer():
                 gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
                     batch,
                     is_train=False,
+                    log=(batch_idx % 10 == 0)
                 )
                 gen_loss.append(gen_loss_i)
                 if self.criterion.adversarial:

@@ -270,7 +270,7 @@ class Trainer():
             name: wandb.Image(img)
         })
 
-    def _plot_img_to_buf(img_tensor, name=None):
+    def _plot_img_to_buf(self, img_tensor, name=None):
         plt.figure(figsize=(20, 20))
         plt.imshow((img_tensor.permute(1, 2, 0).numpy() * 255).astype('uint8'))
         plt.title(name)

@@ -49,5 +49,5 @@ class AdvLoss(nn.Module):
 
         discr_loss = (self.criterion_adv(discr_real_out, ones) +
                       self.criterion_adv(discr_fake_out, zeros)) * 0.5
-        gen_loss = self.criterion_adv(discr_fake_out, ones)
+        gen_loss = self.criterion_adv(discr_fake_out.clone(), ones)
         return discr_loss, gen_loss  # discriminator A, generator B

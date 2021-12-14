@@ -189,7 +189,7 @@ class Trainer():
 
         with torch.no_grad():
             for batch_idx, batch in enumerate(
-                    tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_A), desc="valid",
+                    tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_B), desc="valid",
                          total=len(self.valid_data_loader_A))
             ):
                 gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(

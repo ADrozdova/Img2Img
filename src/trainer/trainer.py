@@ -114,10 +114,10 @@ class Trainer():
 
         if self.criterion.adversarial:
             disc_real_A = self.disc_A(real_A)
-            disc_fake_A = self.disc_A(fake_A)
+            disc_fake_A = self.disc_A(fake_A.detach())
 
             disc_real_B = self.disc_A(real_B)
-            disc_fake_B = self.disc_A(fake_B)
+            disc_fake_B = self.disc_A(fake_B.detach())
         else:
             disc_real_A, disc_fake_A, disc_real_B, disc_fake_B = None, None, None, None
 

@@ -114,17 +114,24 @@ class Trainer():
 
         if self.criterion.adversarial:
             disc_real_A = self.disc_A(real_A)
-            disc_fake_A = self.disc_A(fake_A.detach())
+            disc_fake_A = self.disc_A(fake_A)
+
+            fake_A_detached = fake_A.clone().detach()
+            disc_fake_A_detached = self.disc_A(fake_A_detached)
 
             disc_real_B = self.disc_A(real_B)
-            disc_fake_B = self.disc_A(fake_B.detach())
+            disc_fake_B = self.disc_A(fake_B)
+
+            fake_B_detached = fake_B.clone().detach()
+            disc_fake_B_detached = self.disc_A(fake_B_detached)
         else:
-            disc_real_A, disc_fake_A, disc_real_B, disc_fake_B = None, None, None, None
+            disc_real_A, disc_fake_A, disc_real_B, disc_fake_B, disc_fake_A_detached, disc_fake_B_detached =\
+                None, None, None, None, None, None
 
         id_A_loss, cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(id_A, recon_A, real_A, disc_real_A,
-                                                                           disc_fake_A)
+                                                                           disc_fake_A, disc_fake_A_detached)
         id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(id_B, recon_B, real_B, disc_real_B,
-                                                                           disc_fake_B)
+                                                                           disc_fake_B, disc_fake_B_detached)
 
         gen_loss = (gen_A_loss + gen_B_loss + self.config["loss"]["lambda_id"] * (id_A_loss + id_B_loss) +
                     self.config["loss"]["lambda_cyc"] * (cycle_A_loss + cycle_B_loss)) * 0.5
@@ -134,14 +141,15 @@ class Trainer():
             gen_loss.backward()
             self.optimizer_G.step()
 
-            self.optimizer_DA.zero_grad()
-            self.optimizer_DB.zero_grad()
+            if self.criterion.adversarial:
+                self.optimizer_DA.zero_grad()
+                self.optimizer_DB.zero_grad()
 
-            discr_A_loss.backward()
-            discr_B_loss.backward()
+                discr_A_loss.backward()
+                discr_B_loss.backward()
 
-            self.optimizer_DA.step()
-            self.optimizer_DB.step()
+                self.optimizer_DA.step()
+                self.optimizer_DB.step()
 
         return gen_loss, discr_A_loss, discr_B_loss
 

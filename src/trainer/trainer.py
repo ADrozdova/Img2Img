@@ -3,6 +3,7 @@ import itertools
 import numpy as np
 import torch
 from tqdm import tqdm
+import wandb
 
 
 class Trainer():
@@ -58,6 +59,8 @@ class Trainer():
         self.save_period = config["trainer"]["save_period"]
         self.checkpoint_dir = config.save_dir
 
+        self.run = None
+
 
     @staticmethod
     def move_batch_to_device(batch, device: torch.device):
@@ -83,6 +86,11 @@ class Trainer():
                 gen_loss.append(gen_loss_i)
                 discr_A_loss.append(discr_A_loss_i)
                 discr_B_loss.append(discr_B_loss_i)
+
+                wandb.log({"generator loss train": gen_loss_i,
+                           "discriminator A loss train": discr_A_loss_i,
+                           "discriminator B loss train": discr_B_loss})
+
             except RuntimeError as e:
                 if "out of memory" in str(e) and self.skip_oom:
                     for p in itertools.chain(self.gen_B.parameters(), self.gen_A.parameters(),
@@ -151,7 +159,10 @@ class Trainer():
                 self.optimizer_DA.step()
                 self.optimizer_DB.step()
 
-        return gen_loss.item(), discr_A_loss.item(), discr_B_loss.item()
+        if self.criterion.adversarial:
+            return gen_loss.item(), discr_A_loss.item(), discr_B_loss.item()
+        else:
+            return gen_loss.item(), None, None
 
     def _valid_epoch(self, epoch):
         self.gen_B.eval()
@@ -159,7 +170,10 @@ class Trainer():
         self.disc_A.eval()
         self.disc_B.eval()
 
-        gen_loss, discr_A_loss, discr_B_loss = [], [], []
+        if self.criterion.adversarial:
+            gen_loss, discr_A_loss, discr_B_loss = [], [], []
+        else:
+            gen_loss = []
 
         with torch.no_grad():
             for batch_idx, batch in enumerate(
@@ -171,14 +185,20 @@ class Trainer():
                     is_train=False,
                 )
                 gen_loss.append(gen_loss_i)
-                discr_A_loss.append(discr_A_loss_i)
-                discr_B_loss.append(discr_B_loss_i)
+                if self.criterion.adversarial:
+                    discr_A_loss.append(discr_A_loss_i)
+                    discr_B_loss.append(discr_B_loss_i)
 
-        return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
+        if self.criterion.adversarial:
+            return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
+        else:
+            return np.mean(gen_loss), None, None
 
     def train(self):
         try:
+            self.run = wandb.init(project="image_translation")
             self._train_process()
+            self.run.finish()
         except KeyboardInterrupt as e:
             self._save_checkpoint(self._last_epoch, save_best=False)
             raise e
@@ -191,9 +211,20 @@ class Trainer():
             _, _, _ = self._train_epoch(epoch)
             gen_loss_i, discr_A_loss_i, discr_B_loss_i = self._valid_epoch(epoch)
 
+            if self.criterion.adversarial:
+                wandb.log({"generator loss valid": gen_loss_i,
+                           "discriminator A loss valid": discr_A_loss_i,
+                           "discriminator B loss valid": discr_B_loss,
+                           "epoch": epoch})
+            else:
+                wandb.log({"generator loss valid": gen_loss_i,
+                           "epoch": epoch})
+
             gen_loss.append(gen_loss_i)
-            discr_A_loss.append(discr_A_loss_i)
-            discr_B_loss.append(discr_B_loss_i)
+
+            if self.criterion.adversarial:
+                discr_A_loss.append(discr_A_loss_i)
+                discr_B_loss.append(discr_B_loss_i)
 
             if (epoch + 1) % self.save_period == 0:
                 self._save_checkpoint(epoch)

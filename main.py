@@ -74,8 +74,7 @@ def main(config):
         data_loader_A=dataloaders["train_loader_A"],
         data_loader_B=dataloaders["train_loader_B"],
         valid_data_loader_A=dataloaders["val_loader_A"],
-        valid_data_loader_B=dataloaders["val_loader_B"],
-        len_epoch=config["trainer"].get("len_epoch", None)
+        valid_data_loader_B=dataloaders["val_loader_B"]
     )
 
     trainer.train()

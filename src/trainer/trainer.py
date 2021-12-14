@@ -25,7 +25,6 @@ class Trainer():
             valid_data_loader_A=None,
             valid_data_loader_B=None,
             lr_scheduler=None,
-            len_epoch=None,
             skip_oom=True,
     ):
         super().__init__(gen_B, gen_A, disc_A, disc_B, criterion, optimizer_G, optimizer_DA, optimizer_DB,

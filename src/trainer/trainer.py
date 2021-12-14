@@ -34,6 +34,7 @@ class Trainer():
         self.config = config
 
         self.criterion = criterion
+        self.criterion = self.criterion.to(self.device)
         self.optimizer_G = optimizer_G
         self.optimizer_DA = optimizer_DA
         self.optimizer_DB = optimizer_DB

@@ -30,7 +30,7 @@
     "url": "http://efrosgans.eecs.berkeley.edu/cyclegan/datasets/grumpifycat.zip",
     "parts_train": ["trainA", "trainB"],
     "batch_size_train": 2,
-    "batch_size_val": 2
+    "batch_size_val": 16
   },
   "optimizer": {
     "type": "Adam",

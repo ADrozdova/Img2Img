@@ -188,7 +188,8 @@ class Trainer():
 
         for epoch in range(self.start_epoch, self.epochs + 1):
             self._last_epoch = epoch
-            gen_loss_i, discr_A_loss_i, discr_B_loss_i = self._train_epoch(epoch)
+            _, _, _ = self._train_epoch(epoch)
+            gen_loss_i, discr_A_loss_i, discr_B_loss_i = self._valid_epoch(epoch)
 
             gen_loss.append(gen_loss_i)
             discr_A_loss.append(discr_A_loss_i)

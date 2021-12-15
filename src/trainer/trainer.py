@@ -2,11 +2,11 @@ import io
 import itertools
 
 import PIL
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import wandb
-from tqdm import tqdm
+# import wandb
+# from tqdm import tqdm
 
 
 class Trainer():
@@ -79,8 +79,11 @@ class Trainer():
 
         gen_loss, discr_A_loss, discr_B_loss = [], [], []
 
+        # for batch_idx, batch in enumerate(
+        #         tqdm(zip(self.data_loader_A, self.data_loader_B), desc="train", total=self.len_epoch)
+        # ):
         for batch_idx, batch in enumerate(
-                tqdm(zip(self.data_loader_A, self.data_loader_B), desc="train", total=self.len_epoch)
+                zip(self.data_loader_A, self.data_loader_B)
         ):
             try:
                 gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
@@ -92,9 +95,9 @@ class Trainer():
                 discr_A_loss.append(discr_A_loss_i)
                 discr_B_loss.append(discr_B_loss_i)
 
-                wandb.log({"generator loss train": gen_loss_i,
-                           "discriminator A loss train": discr_A_loss_i,
-                           "discriminator B loss train": discr_B_loss_i})
+                # wandb.log({"generator loss train": gen_loss_i,
+                #            "discriminator A loss train": discr_A_loss_i,
+                #            "discriminator B loss train": discr_B_loss_i})
 
             except RuntimeError as e:
                 if "out of memory" in str(e) and self.skip_oom:
@@ -130,11 +133,11 @@ class Trainer():
 
         name = "train" if is_train else "valid"
 
-        if log:
-            self._log_img("real A " + name, real_A)
-            self._log_img("real B " + name, real_B)
-            self._log_img("fake A " + name, fake_A)
-            self._log_img("fake B " + name, fake_B)
+        # if log:
+        #     self._log_img("real A " + name, real_A)
+        #     self._log_img("real B " + name, real_B)
+        #     self._log_img("fake A " + name, fake_A)
+        #     self._log_img("fake B " + name, fake_B)
 
         if self.criterion.adversarial:
             disc_real_A = self.disc_A(real_A)
@@ -196,9 +199,12 @@ class Trainer():
             gen_loss = []
 
         with torch.no_grad():
+            # for batch_idx, batch in enumerate(
+            #         tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_B), desc="valid",
+            #              total=len(self.valid_data_loader_A))
+            # ):
             for batch_idx, batch in enumerate(
-                    tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_B), desc="valid",
-                         total=len(self.valid_data_loader_A))
+                    zip(self.valid_data_loader_A, self.valid_data_loader_B)
             ):
                 gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
                     batch,
@@ -217,9 +223,9 @@ class Trainer():
 
     def train(self):
         try:
-            self.run = wandb.init(project="image_translation")
+            # self.run = wandb.init(project="image_translation")
             self._train_process()
-            self.run.finish()
+            # self.run.finish()
         except KeyboardInterrupt as e:
             self._save_checkpoint(self._last_epoch, save_best=False)
             raise e
@@ -232,14 +238,14 @@ class Trainer():
             gen_loss_i, discr_A_loss_i, _ = self._train_epoch(epoch)
             gen_loss_i, discr_A_loss_i, discr_B_loss_i = self._valid_epoch(epoch)
 
-            if self.criterion.adversarial:
-                wandb.log({"generator loss valid": gen_loss_i,
-                           "discriminator A loss valid": discr_A_loss_i,
-                           "discriminator B loss valid": discr_B_loss_i,
-                           "epoch": epoch})
-            else:
-                wandb.log({"generator loss valid": gen_loss_i,
-                           "epoch": epoch})
+            # if self.criterion.adversarial:
+            #     wandb.log({"generator loss valid": gen_loss_i,
+            #                "discriminator A loss valid": discr_A_loss_i,
+            #                "discriminator B loss valid": discr_B_loss_i,
+            #                "epoch": epoch})
+            # else:
+            #     wandb.log({"generator loss valid": gen_loss_i,
+            #                "epoch": epoch})
 
             gen_loss.append(gen_loss_i)
 
@@ -287,19 +293,19 @@ class Trainer():
             best_path = str(self.checkpoint_dir / "model_best.pth")
             torch.save(state, best_path)
 
-    def _log_img(self, name, image):
-        img = image[0].permute(1, 2, 0).detach().cpu()
-        img = PIL.Image.open(self._plot_img_to_buf(img))
-        wandb.log({
-            name: wandb.Image(img)
-        })
-        img.close()
+    # def _log_img(self, name, image):
+    #     img = image[0].permute(1, 2, 0).detach().cpu()
+    #     img = PIL.Image.open(self._plot_img_to_buf(img))
+    #     wandb.log({
+    #         name: wandb.Image(img)
+    #     })
+    #     img.close()
 
-    def _plot_img_to_buf(self, img_tensor, name=None):
-        plt.figure(figsize=(20, 20))
-        plt.imshow((img_tensor.numpy() * 255).astype('uint8'))
-        plt.title(name)
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png')
-        buf.seek(0)
-        return buf
+    # def _plot_img_to_buf(self, img_tensor, name=None):
+    #     plt.figure(figsize=(20, 20))
+    #     plt.imshow((img_tensor.numpy() * 255).astype('uint8'))
+    #     plt.title(name)
+    #     buf = io.BytesIO()
+    #     plt.savefig(buf, format='png')
+    #     buf.seek(0)
+    #     return buf

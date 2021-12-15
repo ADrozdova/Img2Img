@@ -26,7 +26,7 @@
     }
   },
   "test": {
-    "checkpoint_file": "",
+    "checkpoint_file": "./model_best_cats_91_epoch_adv.pth",
     "save_dir_A": "./grumpycat_outputs/partA",
     "save_dir_B": "./grumpycat_outputs/partB",
     "img_folder_A": "./grumpifycat/trainA",

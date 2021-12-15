@@ -109,7 +109,10 @@ class Trainer():
 
             if batch_idx >= self.len_epoch:
                 break
-        return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
+        if self.criterion.adversarial:
+            return np.mean(gen_loss), np.mean(discr_A_loss), np.mean(discr_B_loss)
+        else:
+            return np.mean(gen_loss), None, None
 
     def process_batch(self, batch, is_train: bool, log=False):
         real_A, real_B = batch
@@ -247,7 +250,7 @@ class Trainer():
                 discr_A_loss.append(discr_A_loss_i)
                 discr_B_loss.append(discr_B_loss_i)
 
-            if (epoch + 1) % self.save_period == 0:
+            if ((epoch + 1) % self.save_period) == 0:
                 self._save_checkpoint(epoch)
 
     def _save_checkpoint(self, epoch, save_best=False, only_best=False):

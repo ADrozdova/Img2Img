@@ -58,7 +58,7 @@ def run_model(model, img_folder, save_dir):
     for file in files:
         image = transforms.ToTensor()(Image.open(os.path.join(img_folder, file)))
 
-        result = model(image).squeeze(0)
+        result = model(image.unsqueeze(0)).squeeze(0)
         img_to_jpeg(result, os.path.join(save_dir, file))
 
 

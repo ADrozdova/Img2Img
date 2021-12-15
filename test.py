@@ -7,6 +7,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 from tqdm import tqdm
+from pathlib import Path
 
 import src.model as module_arch
 from src.datasets.dataset import TestDataset
@@ -27,7 +28,6 @@ def main(config):
     gen_B = config.init_obj(config["generator"], module_arch)
     gen_A = config.init_obj(config["generator"], module_arch)
 
-    # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config["n_gpu"])
 
     gen_B = gen_B.to(device)
@@ -45,12 +45,25 @@ def main(config):
     state_dict = checkpoint["state_dict_gen_b"]
     gen_B.load_state_dict(state_dict)
 
-    run_model(gen_A, params["img_folder_A"], params["save_dir_A"], device)
-    run_model(gen_B, params["img_folder_B"], params["save_dir_B"], device)
+    resize = None
+    if "resize" in params:
+        resize = params["resize"]
+
+    run_model(gen_A, params["img_folder_A"], params["save_dir_B"], params["save_dir_A_true"], device, resize)
+    run_model(gen_B, params["img_folder_B"], params["save_dir_A"], params["save_dir_A_true"], device, resize)
 
 
-def run_model(model, img_folder, save_dir, device):
-    dataset = TestDataset(img_folder)
+def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
+    if resize is not None:
+        transform = transforms.Compose([
+            transforms.Resize((resize, resize)),
+        ])
+    else:
+        transform = None
+    dataset = TestDataset(img_folder, transform=transform)
+
+    Path(save_dir).mkdir(parents=True, exist_ok=False)
+    Path(save_dir_true).mkdir(parents=True, exist_ok=False)
 
     dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 
@@ -63,6 +76,7 @@ def run_model(model, img_folder, save_dir, device):
         image = image.to(device)
         result = model(image).squeeze(0)
         img_to_jpeg(result, os.path.join(save_dir, file[0]))
+        img_to_jpeg(image.squeeze(0), os.path.join(save_dir_true, file[0]))
 
 
 if __name__ == "__main__":

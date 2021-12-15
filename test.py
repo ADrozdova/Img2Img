@@ -62,7 +62,7 @@ def run_model(model, img_folder, save_dir, device):
         file, image = batch
         image = image.to(device)
         result = model(image).squeeze(0)
-        img_to_jpeg(result, os.path.join(save_dir, file))
+        img_to_jpeg(result, os.path.join(save_dir, file[0]))
 
 
 if __name__ == "__main__":

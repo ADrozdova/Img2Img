@@ -1,21 +1,7 @@
 {
-  "name": "grumpycat non adv config",
+  "name": "grumpycat non adv test config",
   "n_gpu": 1,
   "preprocessing": {
-  },
-  "generator": {
-    "type": "Generator",
-    "args": {
-      "in_size": 3,
-      "n_filter": 64,
-      "n_blocks": 4,
-      "enc_kernels": [7, 3, 3],
-      "enc_stride": 1,
-      "enc_padding": [0, 1, 1],
-      "dec_kernels": [3, 3],
-      "dec_stride": 2,
-      "dec_padding": [1, 1]
-    }
   },
   "dataset": {
     "img_folder": "grumpifycat",

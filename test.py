@@ -50,7 +50,7 @@ def main(config):
         resize = params["resize"]
 
     run_model(gen_A, params["img_folder_A"], params["save_dir_B"], params["save_dir_A_true"], device, resize)
-    run_model(gen_B, params["img_folder_B"], params["save_dir_A"], params["save_dir_A_true"], device, resize)
+    run_model(gen_B, params["img_folder_B"], params["save_dir_A"], params["save_dir_B_true"], device, resize)
 
 
 def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):

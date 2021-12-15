@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
-from tqdm import tqdm
+# from tqdm import tqdm
 from pathlib import Path
 
 import src.model as module_arch
@@ -67,11 +67,12 @@ def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
 
     dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 
-    for batch_idx, batch in tqdm(
-            enumerate(dataloader),
-            desc="test",
-            total=len(dataloader),
-    ):
+    # for batch_idx, batch in tqdm(
+    #         enumerate(dataloader),
+    #         desc="test",
+    #         total=len(dataloader),
+    # ):
+    for batch_idx, batch in enumerate(dataloader):
         file, image = batch
         image = image.to(device)
         result = model(image).squeeze(0)

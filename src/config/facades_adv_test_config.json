@@ -57,7 +57,7 @@
     "early_stop": 100
   },
   "test": {
-    "checkpoint_file": "./model_best_facades_21_epoch_adv.pth",
+    "checkpoint_file": "./saved/models/facades adv config/1215_081205629530/checkpoint-epoch25.pth",
     "save_dir_A": "./facades_outputs/partA",
     "save_dir_B": "./facades_outputs/partB",
     "save_dir_A_true": "./facades_true/partA",

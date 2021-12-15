@@ -1,0 +1,35 @@
+{
+  "name": "grumpycat test config",
+  "n_gpu": 1,
+  "preprocessing": {
+  },
+  "generator": {
+    "type": "Generator",
+    "args": {
+      "in_size": 3,
+      "n_filter": 64,
+      "n_blocks": 4,
+      "enc_kernels": [7, 3, 3],
+      "enc_stride": 1,
+      "enc_padding": [0, 1, 1],
+      "dec_kernels": [3, 3],
+      "dec_stride": 2,
+      "dec_padding": [1, 1]
+    }
+  },
+  "discriminator": {
+    "type": "Discriminator",
+    "args": {
+      "channels": [3, 64, 128, 256, 512],
+      "kernel_sz": 4,
+      "padding": 1
+    }
+  },
+  "test": {
+    "checkpoint_file": "",
+    "save_dir_A": "./grumpycat_outputs/partA",
+    "save_dir_B": "./grumpycat_outputs/partB",
+    "img_folder_A": "./grumpifycat/trainA",
+    "img_folder_B": "./grumpifycat/trainB"
+  }
+}

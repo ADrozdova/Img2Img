@@ -3,6 +3,7 @@ import subprocess
 import zipfile
 
 import torch
+from torchvision.io import write_jpeg
 
 
 def prepare_device(n_gpu_use):
@@ -23,6 +24,7 @@ def prepare_device(n_gpu_use):
     list_ids = list(range(n_gpu_use))
     return device, list_ids
 
+
 def load_dataset(url, zipname):
     if url is None:
         raise RuntimeError("Can't load dataset with None url")
@@ -35,3 +37,7 @@ def load_dataset(url, zipname):
         zip_ref.extractall(".")
 
     os.remove(zipname)
+
+
+def img_to_jpeg(image, filename):
+    write_jpeg((image.cpu() * 255).to(torch.uint8), filename=filename)

@@ -27,37 +27,47 @@ def main(config):
     # setup data_loader instances
     dataloaders = get_dataloaders(config)
 
-    # build model architecture, then print to console
     gen_B = config.init_obj(config["generator"], module_arch)
     gen_A = config.init_obj(config["generator"], module_arch)
-
-    disc_A = config.init_obj(config["discriminator"], module_arch)
-    disc_B = config.init_obj(config["discriminator"], module_arch)
 
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config["n_gpu"])
 
+    loss_module = config.init_obj(config["loss"], module_loss).to(device)
+
+    if loss_module.adversarial:
+        disc_A = config.init_obj(config["discriminator"], module_arch)
+        disc_B = config.init_obj(config["discriminator"], module_arch)
+    else:
+        disc_A = None
+        disc_B = None
+
+
     gen_B = gen_B.to(device)
     gen_A = gen_A.to(device)
-    disc_A = disc_A.to(device)
-    disc_B = disc_B.to(device)
+
+    if loss_module.adversarial:
+        disc_A = disc_A.to(device)
+        disc_B = disc_B.to(device)
 
     if len(device_ids) > 1:
         gen_B = torch.nn.DataParallel(gen_B, device_ids=device_ids)
         gen_A = torch.nn.DataParallel(gen_A, device_ids=device_ids)
-        disc_A = torch.nn.DataParallel(disc_A, device_ids=device_ids)
-        disc_B = torch.nn.DataParallel(disc_B, device_ids=device_ids)
-
-    loss_module = config.init_obj(config["loss"], module_loss).to(device)
+        if loss_module.adversarial:
+            disc_A = torch.nn.DataParallel(disc_A, device_ids=device_ids)
+            disc_B = torch.nn.DataParallel(disc_B, device_ids=device_ids)
 
     trainable_params = filter(lambda p: p.requires_grad, itertools.chain(gen_A.parameters(), gen_B.parameters()))
     optimizer_G = config.init_obj(config["optimizer"], torch.optim, trainable_params)
 
-    trainable_params = filter(lambda p: p.requires_grad, disc_A.parameters())
-    optimizer_DA = config.init_obj(config["optimizer"], torch.optim, trainable_params)
+    if loss_module.adversarial:
+        trainable_params = filter(lambda p: p.requires_grad, disc_A.parameters())
+        optimizer_DA = config.init_obj(config["optimizer"], torch.optim, trainable_params)
 
-    trainable_params = filter(lambda p: p.requires_grad, disc_B.parameters())
-    optimizer_DB = config.init_obj(config["optimizer"], torch.optim, trainable_params)
+        trainable_params = filter(lambda p: p.requires_grad, disc_B.parameters())
+        optimizer_DB = config.init_obj(config["optimizer"], torch.optim, trainable_params)
+    else:
+        optimizer_DA, optimizer_DB = None, None
     # lr_scheduler = config.init_obj(config["lr_scheduler"], torch.optim.lr_scheduler, optimizer)
 
     trainer = Trainer(

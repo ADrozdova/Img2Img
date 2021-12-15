@@ -25,6 +25,14 @@
       "padding": 1
     }
   },
+    "trainer": {
+    "epochs": 100,
+    "save_dir": "saved/",
+    "save_period": 10,
+    "verbosity": 2,
+    "monitor": "min val_loss",
+    "early_stop": 100
+  },
   "test": {
     "checkpoint_file": "./model_best_cats_91_epoch_adv.pth",
     "save_dir_A": "./grumpycat_outputs/partA",

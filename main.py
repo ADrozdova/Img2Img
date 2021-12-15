@@ -84,7 +84,7 @@ def main(config):
         if "state_dict_discr_a" in checkpoint:
             state_dict = checkpoint["state_dict_discr_a"]
             disc_A.load_state_dict(state_dict)
-            state_dict = checkpoint["state_dict_discr_b"]
+            state_dict = checkpoint["state_dict_disrc_b"]
             disc_B.load_state_dict(state_dict)
 
             state_dict = checkpoint["optimizer_DA"]

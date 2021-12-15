@@ -69,8 +69,10 @@ def main(config):
     else:
         optimizer_DA, optimizer_DB = None, None
 
-    if "resume" in config:
-        checkpoint = torch.load(config["resume"]['checkpoint'])
+    resume = config["trainer"].get("resume", None)
+
+    if resume is not None:
+        checkpoint = torch.load(resume)
         state_dict = checkpoint["state_dict_gen_a"]
         gen_A.load_state_dict(state_dict)
         state_dict = checkpoint["state_dict_gen_b"]

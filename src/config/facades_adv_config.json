@@ -55,9 +55,7 @@
     "save_period": 10,
     "verbosity": 2,
     "monitor": "min val_loss",
-    "early_stop": 100
-  },
-  "resume": {
-    "checkpoint": "model_best.pth"
+    "early_stop": 100,
+    "resume": "model_best.pth"
   }
 }

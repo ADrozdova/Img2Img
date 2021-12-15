@@ -1,18 +1,15 @@
 import argparse
-import collections
+import os
 import warnings
 
 import numpy as np
-import itertools
-from PIL import Image
-
 import torch
-import os
+from PIL import Image
 from torchvision import transforms
-import src.loss as module_loss
+from tqdm import tqdm
+
 import src.model as module_arch
-from src.datasets.utils import get_dataloaders
-from src.trainer import Trainer
+from src.datasets.dataset import TestDataset
 from src.utils import prepare_device, img_to_jpeg
 from src.utils.parse_config import ConfigParser
 
@@ -48,17 +45,23 @@ def main(config):
     state_dict = checkpoint["state_dict_gen_b"]
     gen_B.load_state_dict(state_dict)
 
-    run_model(gen_A, params["img_folder_A"], params["save_dir_A"])
-    run_model(gen_B, params["img_folder_B"], params["save_dir_B"])
+    run_model(gen_A, params["img_folder_A"], params["save_dir_A"], device)
+    run_model(gen_B, params["img_folder_B"], params["save_dir_B"], device)
 
 
-def run_model(model, img_folder, save_dir):
-    files = os.listdir(img_folder)
+def run_model(model, img_folder, save_dir, device):
+    dataset = TestDataset(img_folder)
 
-    for file in files:
-        image = transforms.ToTensor()(Image.open(os.path.join(img_folder, file)))
+    dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 
-        result = model(image.unsqueeze(0)).squeeze(0)
+    for batch_idx, batch in tqdm(
+            enumerate(dataloader),
+            desc="test",
+            total=len(dataloader),
+    ):
+        file, image = batch
+        image = image.to(device)
+        result = model(image).squeeze(0)
         img_to_jpeg(result, os.path.join(save_dir, file))
 
 

@@ -34,7 +34,7 @@
     "early_stop": 100
   },
   "test": {
-    "checkpoint_file": "./model_best_cats_91_epoch_adv.pth",
+    "checkpoint_file": "./checkpoint-epoch99.pth",
     "save_dir_A": "./grumpycat_outputs/partA",
     "save_dir_B": "./grumpycat_outputs/partB",
     "save_dir_A_true": "./grumpycat_true/partA",

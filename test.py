@@ -62,8 +62,8 @@ def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
         transform = None
     dataset = TestDataset(img_folder, transform=transform)
 
-    Path(save_dir).mkdir(parents=True, exist_ok=False)
-    Path(save_dir_true).mkdir(parents=True, exist_ok=False)
+    Path(save_dir).mkdir(parents=True, exist_ok=True)
+    Path(save_dir_true).mkdir(parents=True, exist_ok=True)
 
     dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 

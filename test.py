@@ -27,9 +27,6 @@ np.random.seed(SEED)
 
 
 def main(config):
-    # setup data_loader instances
-    dataloaders = get_dataloaders(config)
-
     gen_B = config.init_obj(config["generator"], module_arch)
     gen_A = config.init_obj(config["generator"], module_arch)
 

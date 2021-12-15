@@ -38,7 +38,7 @@ class TestDataset(torch.utils.data.Dataset):
         return len(self.all_imgs)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_folder, self.part, self.all_imgs[idx])
+        img_path = os.path.join(self.img_folder, self.all_imgs[idx])
         image = torchvision.transforms.ToTensor()(Image.open(img_path))
         if self.transform:
             image = self.transform(image)

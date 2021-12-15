@@ -8,7 +8,7 @@
     "args": {
       "in_size": 3,
       "n_filter": 64,
-      "n_blocks": 4,
+      "n_blocks": 9,
       "enc_kernels": [7, 3, 3],
       "enc_stride": 1,
       "enc_padding": [0, 1, 1],

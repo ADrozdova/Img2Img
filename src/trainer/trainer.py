@@ -73,8 +73,9 @@ class Trainer():
     def _train_epoch(self, epoch):
         self.gen_B.train()
         self.gen_A.train()
-        self.disc_A.train()
-        self.disc_B.train()
+        if self.disc_A is not None:
+            self.disc_A.train()
+            self.disc_B.train()
 
         gen_loss, discr_A_loss, discr_B_loss = [], [], []
 
@@ -153,8 +154,11 @@ class Trainer():
         id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(id_B, recon_B, real_B, disc_real_B,
                                                                            disc_fake_B, disc_fake_B_detached)
 
-        gen_loss = (gen_A_loss + gen_B_loss + self.config["loss"]["lambda_id"] * (id_A_loss + id_B_loss) +
+        gen_loss = (self.config["loss"]["lambda_id"] * (id_A_loss + id_B_loss) +
                     self.config["loss"]["lambda_cyc"] * (cycle_A_loss + cycle_B_loss)) * 0.5
+
+        if self.criterion.adversarial:
+            gen_loss += (gen_A_loss + gen_B_loss) * 0.5
 
         if is_train:
             self.optimizer_G.zero_grad()
@@ -179,8 +183,9 @@ class Trainer():
     def _valid_epoch(self, epoch):
         self.gen_B.eval()
         self.gen_A.eval()
-        self.disc_A.eval()
-        self.disc_B.eval()
+        if self.criterion.adversarial:
+            self.disc_A.eval()
+            self.disc_B.eval()
 
         if self.criterion.adversarial:
             gen_loss, discr_A_loss, discr_B_loss = [], [], []
@@ -221,7 +226,7 @@ class Trainer():
 
         for epoch in range(self.start_epoch, self.epochs + 1):
             self._last_epoch = epoch
-            _, _, _ = self._train_epoch(epoch)
+            gen_loss_i, discr_A_loss_i, _ = self._train_epoch(epoch)
             gen_loss_i, discr_A_loss_i, discr_B_loss_i = self._valid_epoch(epoch)
 
             if self.criterion.adversarial:
@@ -248,20 +253,30 @@ class Trainer():
     def _save_checkpoint(self, epoch, save_best=False, only_best=False):
         arch_g = type(self.gen_B).__name__
         arch_d = type(self.disc_A).__name__
-
-        state = {
-            "arch_g": arch_g,
-            "arch_d": arch_d,
-            "epoch": epoch,
-            "state_dict_gen_a": self.gen_A.state_dict(),
-            "state_dict_gen_b": self.gen_B.state_dict(),
-            "state_dict_discr_a": self.disc_A.state_dict(),
-            "state_dict_disrc_b": self.disc_B.state_dict(),
-            "optimizer_G": self.optimizer_G.state_dict(),
-            "optimizer_DA": self.optimizer_DA.state_dict(),
-            "optimizer_DB": self.optimizer_DB.state_dict(),
-            "config": self.config,
-        }
+        if self.criterion.adversarial:
+            state = {
+                "arch_g": arch_g,
+                "arch_d": arch_d,
+                "epoch": epoch,
+                "state_dict_gen_a": self.gen_A.state_dict(),
+                "state_dict_gen_b": self.gen_B.state_dict(),
+                "state_dict_discr_a": self.disc_A.state_dict(),
+                "state_dict_disrc_b": self.disc_B.state_dict(),
+                "optimizer_G": self.optimizer_G.state_dict(),
+                "optimizer_DA": self.optimizer_DA.state_dict(),
+                "optimizer_DB": self.optimizer_DB.state_dict(),
+                "config": self.config,
+            }
+        else:
+            state = {
+                "arch_g": arch_g,
+                "arch_d": arch_d,
+                "epoch": epoch,
+                "state_dict_gen_a": self.gen_A.state_dict(),
+                "state_dict_gen_b": self.gen_B.state_dict(),
+                "optimizer_G": self.optimizer_G.state_dict(),
+                "config": self.config,
+            }
         filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
         if not (only_best and save_best):
             torch.save(state, filename)

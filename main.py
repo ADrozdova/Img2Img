@@ -68,6 +68,28 @@ def main(config):
         optimizer_DB = config.init_obj(config["optimizer"], torch.optim, trainable_params)
     else:
         optimizer_DA, optimizer_DB = None, None
+
+    if "resume" in config:
+        checkpoint = torch.load(config["resume"]['checkpoint'])
+        state_dict = checkpoint["state_dict_gen_a"]
+        gen_A.load_state_dict(state_dict)
+        state_dict = checkpoint["state_dict_gen_b"]
+        gen_B.load_state_dict(state_dict)
+
+        state_dict = checkpoint["optimizer_G"]
+        optimizer_G.load_state_dict(state_dict)
+
+        if "state_dict_discr_a" in checkpoint:
+            state_dict = checkpoint["state_dict_discr_a"]
+            disc_A.load_state_dict(state_dict)
+            state_dict = checkpoint["state_dict_discr_b"]
+            disc_B.load_state_dict(state_dict)
+
+            state_dict = checkpoint["optimizer_DA"]
+            optimizer_DA.load_state_dict(state_dict)
+            state_dict = checkpoint["optimizer_DB"]
+            optimizer_DB.load_state_dict(state_dict)
+
     # lr_scheduler = config.init_obj(config["lr_scheduler"], torch.optim.lr_scheduler, optimizer)
 
     trainer = Trainer(

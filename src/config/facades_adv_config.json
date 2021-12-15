@@ -8,7 +8,7 @@
     "args": {
       "in_size": 3,
       "n_filter": 64,
-      "n_blocks": 4,
+      "n_blocks": 9,
       "enc_kernels": [7, 3, 3],
       "enc_stride": 1,
       "enc_padding": [0, 1, 1],
@@ -31,7 +31,8 @@
     "parts_train": ["trainA", "trainB"],
     "parts_val": ["testA", "testB"],
     "batch_size_train": 2,
-    "batch_size_val": 16
+    "batch_size_val": 16,
+    "resize": 128
   },
   "optimizer": {
     "type": "Adam",
@@ -55,5 +56,8 @@
     "verbosity": 2,
     "monitor": "min val_loss",
     "early_stop": 100
+  },
+  "resume": {
+    "checkpoint": "model_best.pth"
   }
 }

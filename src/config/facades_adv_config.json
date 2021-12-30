@@ -56,6 +56,6 @@
     "verbosity": 2,
     "monitor": "min val_loss",
     "early_stop": 100,
-    "resume": "model_best.pth"
+    "visualize": "wandb"
   }
 }

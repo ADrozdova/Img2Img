@@ -24,11 +24,15 @@ np.random.seed(SEED)
 
 
 def main(config):
+    logger = config.get_logger("train")
+
     # setup data_loader instances
     dataloaders = get_dataloaders(config)
 
     gen_B = config.init_obj(config["generator"], module_arch)
     gen_A = config.init_obj(config["generator"], module_arch)
+
+    logger.info(gen_A)
 
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config["n_gpu"])
@@ -38,10 +42,10 @@ def main(config):
     if loss_module.adversarial:
         disc_A = config.init_obj(config["discriminator"], module_arch)
         disc_B = config.init_obj(config["discriminator"], module_arch)
+        logger.info(disc_A)
     else:
         disc_A = None
         disc_B = None
-
 
     gen_B = gen_B.to(device)
     gen_A = gen_A.to(device)
@@ -68,29 +72,6 @@ def main(config):
         optimizer_DB = config.init_obj(config["optimizer"], torch.optim, trainable_params)
     else:
         optimizer_DA, optimizer_DB = None, None
-
-    resume = config["trainer"].get("resume", None)
-
-    if resume is not None:
-        checkpoint = torch.load(resume)
-        state_dict = checkpoint["state_dict_gen_a"]
-        gen_A.load_state_dict(state_dict)
-        state_dict = checkpoint["state_dict_gen_b"]
-        gen_B.load_state_dict(state_dict)
-
-        state_dict = checkpoint["optimizer_G"]
-        optimizer_G.load_state_dict(state_dict)
-
-        if "state_dict_discr_a" in checkpoint:
-            state_dict = checkpoint["state_dict_discr_a"]
-            disc_A.load_state_dict(state_dict)
-            state_dict = checkpoint["state_dict_disrc_b"]
-            disc_B.load_state_dict(state_dict)
-
-            state_dict = checkpoint["optimizer_DA"]
-            optimizer_DA.load_state_dict(state_dict)
-            state_dict = checkpoint["optimizer_DB"]
-            optimizer_DB.load_state_dict(state_dict)
 
     # lr_scheduler = config.init_obj(config["lr_scheduler"], torch.optim.lr_scheduler, optimizer)
 
@@ -123,6 +104,28 @@ if __name__ == "__main__":
         type=str,
         help="config file path (default: None)",
     )
+    args.add_argument(
+        "-r",
+        "--resume",
+        default=None,
+        type=str,
+        help="path to latest checkpoint (default: None)",
+    )
+    args.add_argument(
+        "-d",
+        "--device",
+        default=None,
+        type=str,
+        help="indices of GPUs to enable (default: all)",
+    )
 
-    config = ConfigParser.from_args(args)
+    # custom cli options to modify configuration from default values given in json file.
+    CustomArgs = collections.namedtuple("CustomArgs", "flags type target")
+    options = [
+        CustomArgs(["--lr", "--learning_rate"], type=float, target="optimizer;args;lr"),
+        CustomArgs(
+            ["--bs", "--batch_size"], type=int, target="data_loader;args;batch_size"
+        ),
+    ]
+    config = ConfigParser.from_args(args, options)
     main(config)

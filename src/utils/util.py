@@ -10,6 +10,8 @@ import pandas as pd
 import torch
 from torchvision.io import write_jpeg
 
+ROOT_PATH = Path(__file__).absolute().resolve().parent.parent.parent
+
 
 def ensure_dir(dirname):
     dirname = Path(dirname)

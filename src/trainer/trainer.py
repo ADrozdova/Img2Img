@@ -253,47 +253,6 @@ class Trainer(BaseTrainer):
             total = self.len_epoch
         return base.format(current, total, 100.0 * current / total)
 
-    def _train_process(self):
-        gen_loss, discr_A_loss, discr_B_loss = [], [], []
-
-        for epoch in range(self.start_epoch, self.epochs + 1):
-            self._last_epoch = epoch
-            gen_loss_i, discr_A_loss_i, _ = self._train_epoch(epoch)
-            gen_loss_i, discr_A_loss_i, discr_B_loss_i = self._valid_epoch(epoch)
-
-            if self.criterion.adversarial:
-                self.writer.add_scalar(
-                    "generator loss valid", gen_loss_i
-                )
-                self.writer.add_scalar(
-                    "discriminator A loss valid", discr_A_loss_i
-                )
-                self.writer.add_scalar(
-                    "discriminator B loss valid", discr_B_loss_i
-                )
-                self.writer.add_scalar(
-                    "epoch", epoch
-                )
-            else:
-                self.writer.add_scalar(
-                    "generator loss valid", gen_loss_i
-                )
-                self.writer.add_scalar(
-                    "epoch", epoch
-                )
-
-            gen_loss.append(gen_loss_i)
-
-            if len(gen_loss) > 1 and gen_loss[-1] < gen_loss[-2]:
-                self._save_checkpoint(epoch, save_best=True)
-
-            if self.criterion.adversarial:
-                discr_A_loss.append(discr_A_loss_i)
-                discr_B_loss.append(discr_B_loss_i)
-
-            if ((epoch + 1) % self.save_period) == 0:
-                self._save_checkpoint(epoch)
-
     def _log_scalars(self, metric_tracker: MetricTracker):
         if self.writer is None:
             return

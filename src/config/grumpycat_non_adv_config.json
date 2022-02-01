@@ -23,7 +23,8 @@
     "parts_train": ["trainA", "trainB"],
     "batch_size_train": 2,
     "batch_size_val": 2,
-    "resize": 128
+    "resize": 128,
+    "valid_rate": 0.8
   },
   "optimizer": {
     "type": "Adam",
@@ -35,7 +36,8 @@
   "loss": {
     "type": "CycleGanLoss",
     "args": {
-      "adversarial": "False"
+      "types": ["cycle", "id"],
+      "discr_loss_coef": 0.5
     },
     "lambda_cyc": 10.0,
     "lambda_id": 5.0

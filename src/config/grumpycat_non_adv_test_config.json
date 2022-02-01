@@ -11,14 +11,6 @@
     "batch_size_val": 2,
     "resize": 128
   },
-  "loss": {
-    "type": "CycleGanLoss",
-    "args": {
-      "adversarial": "False"
-    },
-    "lambda_cyc": 10.0,
-    "lambda_id": 5.0
-  },
   "trainer": {
     "epochs": 100,
     "save_dir": "saved/",

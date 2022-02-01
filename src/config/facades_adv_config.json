@@ -44,7 +44,8 @@
   "loss": {
     "type": "CycleGanLoss",
     "args": {
-      "adversarial": "True"
+      "types": ["cycle", "id", "adversarial"],
+      "discr_loss_coef": 0.5
     },
     "lambda_cyc": 10.0,
     "lambda_id": 5.0
@@ -54,6 +55,7 @@
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,
+    "log_step": 10,
     "monitor": "min val_loss",
     "early_stop": 100,
     "visualize": "wandb"

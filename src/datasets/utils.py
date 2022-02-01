@@ -29,16 +29,20 @@ def get_dataloaders(config):
     )
 
     if "parts_val" not in params:
-        train_size = int(len(train_set_A) * 0.8)
+        train_size = int(len(train_set_A) * params["valid_rate"])
 
         train_set_A, val_set_A = torch.utils.data.random_split(
-            train_set_A, [train_size, len(train_set_A) - train_size]
+            train_set_A,
+            [train_size, len(train_set_A) - train_size],
+            generator=torch.Generator().manual_seed(42),
         )
 
-        train_size = int(len(train_set_B) * 0.8)
+        train_size = int(len(train_set_B) * params["valid_rate"])
 
         train_set_B, val_set_B = torch.utils.data.random_split(
-            train_set_B, [train_size, len(train_set_B) - train_size]
+            train_set_B,
+            [train_size, len(train_set_B) - train_size],
+            generator=torch.Generator().manual_seed(42),
         )
 
     else:

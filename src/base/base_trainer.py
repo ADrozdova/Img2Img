@@ -1,31 +1,61 @@
+import itertools
 from abc import abstractmethod
 
 import torch
 from numpy import inf
 
-from src.base import BaseModel
 from src.logger import get_visualizer
+from src.utils.init_models import init_gen, init_disc
 
 
 class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, gen_B: BaseModel, gen_A: BaseModel, disc_A: BaseModel, disc_B: BaseModel,
-                 criterion, optimizer_G, optimizer_DA, optimizer_DB, config, device):
+
+    def __init__(self, criterion, config, device, device_ids, adversarial=True):
         self.device = device
         self.config = config
         self.logger = config.get_logger("trainer", config["trainer"]["verbosity"])
 
-        self.gen_B = gen_B
-        self.gen_A = gen_A
-        self.disc_A = disc_A
-        self.disc_B = disc_B
+        self.gen_A, self.gen_B = init_gen(config, device, device_ids)
+
+        self.adversarial = adversarial
+
+        if adversarial:
+            self.disc_A, self.disc_B = init_disc(config, device, device_ids)
+        else:
+            self.disc_A, self.disc_B = None, None
+
         self.criterion = criterion
         self.criterion = self.criterion.to(self.device)
-        self.optimizer_G = optimizer_G
-        self.optimizer_DA = optimizer_DA
-        self.optimizer_DB = optimizer_DB
+
+        trainable_params = filter(
+            lambda p: p.requires_grad,
+            itertools.chain(self.gen_A.parameters(), self.gen_B.parameters()),
+        )
+        self.optimizer_G = config.init_obj(
+            config["optimizer"], torch.optim, trainable_params
+        )
+
+        if adversarial:
+            trainable_params = filter(
+                lambda p: p.requires_grad, self.disc_A.parameters()
+            )
+            self.optimizer_DA = config.init_obj(
+                config["optimizer"], torch.optim, trainable_params
+            )
+
+            trainable_params = filter(
+                lambda p: p.requires_grad, self.disc_B.parameters()
+            )
+            self.optimizer_DB = config.init_obj(
+                config["optimizer"], torch.optim, trainable_params
+            )
+        else:
+            self.optimizer_DA, self.optimizer_DB = None, None
+
+        # self.lr_scheduler = config.init_obj(config["lr_scheduler"], torch.optim.lr_scheduler, optimizer)
 
         # for interrupt saving
         self._last_epoch = 0
@@ -53,9 +83,7 @@ class BaseTrainer:
         self.checkpoint_dir = config.save_dir
 
         # setup visualization writer instance
-        self.writer = get_visualizer(
-            config, self.logger, cfg_trainer["visualize"]
-        )
+        self.writer = get_visualizer(config, self.logger, cfg_trainer["visualize"])
 
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
@@ -100,12 +128,10 @@ class BaseTrainer:
                 try:
                     # check whether model performance improved or not, according to specified metric(mnt_metric)
                     improved = (
-                                       self.mnt_mode == "min" and log[
-                                   self.mnt_metric] <= self.mnt_best
-                               ) or (
-                                       self.mnt_mode == "max" and log[
-                                   self.mnt_metric] >= self.mnt_best
-                               )
+                        self.mnt_mode == "min" and log[self.mnt_metric] <= self.mnt_best
+                    ) or (
+                        self.mnt_mode == "max" and log[self.mnt_metric] >= self.mnt_best
+                    )
                 except KeyError:
                     self.logger.warning(
                         "Warning: Metric '{}' is not found. "
@@ -195,8 +221,8 @@ class BaseTrainer:
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
         if (
-                checkpoint["config"]["optimizer"] != self.config["optimizer"] or
-                checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
+            checkpoint["config"]["optimizer"] != self.config["optimizer"]
+            or checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
         ):
             self.logger.warning(
                 "Warning: Optimizer or lr_scheduler given in config file is different "

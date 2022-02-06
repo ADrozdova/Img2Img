@@ -44,6 +44,7 @@ class ConfigParser:
         # configure logging module
         setup_logging(self.log_dir)
         self.log_levels = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+        self.local_rank = 0
 
     @classmethod
     def from_args(cls, args, options=""):
@@ -54,7 +55,6 @@ class ConfigParser:
             args.add_argument(*opt.flags, default=None, type=opt.type)
         if not isinstance(args, tuple):
             args = args.parse_args()
-
         if args.device is not None:
             os.environ["CUDA_VISIBLE_DEVICES"] = args.device
         if args.resume is not None:
@@ -75,6 +75,7 @@ class ConfigParser:
         modification = {
             opt.target: getattr(args, _get_opt_name(opt.flags)) for opt in options
         }
+        config.local_rank = args.local_rank
         return cls(config, resume, modification)
 
     def init_obj(self, obj_dict, module, *args, **kwargs):

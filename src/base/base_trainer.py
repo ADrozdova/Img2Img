@@ -13,17 +13,20 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, criterion, config, device, device_ids, adversarial=True):
+    def __init__(self, criterion, config, device, local_rank, adversarial=True):
         self.device = device
         self.config = config
         self.logger = config.get_logger("trainer", config["trainer"]["verbosity"])
 
-        self.gen_A, self.gen_B = init_gen(config, device, device_ids)
+        torch.distributed.init_process_group(backend="nccl")
+        self.local_rank = local_rank
+
+        self.gen_A, self.gen_B = init_gen(config, device, local_rank)
 
         self.adversarial = adversarial
 
         if adversarial:
-            self.disc_A, self.disc_B = init_disc(config, device, device_ids)
+            self.disc_A, self.disc_B = init_disc(config, device, local_rank)
         else:
             self.disc_A, self.disc_B = None, None
 
@@ -167,6 +170,9 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
+        if self.local_rank != 0:
+            return
+
         arch_gen = type(self.gen_A).__name__
 
         state = {
@@ -174,11 +180,15 @@ class BaseTrainer:
             "epoch": epoch,
             "state_dict_gen_A": self.gen_A.state_dict(),
             "state_dict_gen_B": self.gen_B.state_dict(),
-            "state_dict_disc_A": self.disc_A.state_dict(),
-            "state_dict_disc_B": self.disc_B.state_dict(),
+            "state_dict_disc_A": self.disc_A.state_dict() if self.adversarial else None,
+            "state_dict_disc_B": self.disc_B.state_dict() if self.adversarial else None,
             "optimizer_G": self.optimizer_G.state_dict(),
-            "optimizer_DA": self.optimizer_DA.state_dict(),
-            "optimizer_DB": self.optimizer_DB.state_dict(),
+            "optimizer_DA": self.optimizer_DA.state_dict()
+            if self.adversarial
+            else None,
+            "optimizer_DB": self.optimizer_DB.state_dict()
+            if self.adversarial
+            else None,
             "monitor_best": self.mnt_best,
             "config": self.config,
         }
@@ -209,15 +219,39 @@ class BaseTrainer:
                 "Warning: Architecture configuration given in config file is different from that of "
                 "checkpoint. This may yield an exception while state_dict is being loaded."
             )
-        self.gen_A.load_state_dict(checkpoint["state_dict_gen_A"])
-        self.gen_B.load_state_dict(checkpoint["state_dict_gen_B"])
+        self.gen_A.load_state_dict(
+            checkpoint["state_dict_gen_A"], map_location=self.device
+        )
+        self.gen_B.load_state_dict(
+            checkpoint["state_dict_gen_B"], map_location=self.device
+        )
+
+        self.gen_A = torch.nn.parallel.DistributedDataParallel(
+            self.gen_A, device_ids=[self.local_rank], output_device=self.local_rank
+        )
+        self.gen_B = torch.nn.parallel.DistributedDataParallel(
+            self.gen_B, device_ids=[self.local_rank], output_device=self.local_rank
+        )
         if checkpoint["config"]["discriminator"] != self.config["discriminator"]:
             self.logger.warning(
                 "Warning: Architecture configuration given in config file is different from that of "
                 "checkpoint. This may yield an exception while state_dict is being loaded."
             )
-        self.disc_A.load_state_dict(checkpoint["state_dict_disc_A"])
-        self.disc_B.load_state_dict(checkpoint["state_dict_disc_B"])
+
+        if self.adversarial:
+            self.disc_A.load_state_dict(
+                checkpoint["state_dict_disc_A"], map_location=self.device
+            )
+            self.disc_B.load_state_dict(
+                checkpoint["state_dict_disc_B"], map_location=self.device
+            )
+
+            self.disc_A = torch.nn.parallel.DistributedDataParallel(
+                self.disc_A, device_ids=[self.local_rank], output_device=self.local_rank
+            )
+            self.disc_B = torch.nn.parallel.DistributedDataParallel(
+                self.disc_B, device_ids=[self.local_rank], output_device=self.local_rank
+            )
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
         if (
@@ -230,8 +264,9 @@ class BaseTrainer:
             )
         else:
             self.optimizer_G.load_state_dict(checkpoint["optimizer_G"])
-            self.optimizer_DA.load_state_dict(checkpoint["optimizer_DA"])
-            self.optimizer_DB.load_state_dict(checkpoint["optimizer_DB"])
+            if self.adversarial:
+                self.optimizer_DA.load_state_dict(checkpoint["optimizer_DA"])
+                self.optimizer_DB.load_state_dict(checkpoint["optimizer_DB"])
 
         self.logger.info(
             "Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch)

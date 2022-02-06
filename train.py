@@ -23,7 +23,7 @@ def main(config):
     dataloaders = get_dataloaders(config)
 
     # prepare for (multi-device) GPU training
-    device, device_ids = prepare_device(config["n_gpu"])
+    device = prepare_device(config["n_gpu"])
 
     loss_module = config.init_obj(config["loss"], module_loss).to(device)
 
@@ -31,7 +31,7 @@ def main(config):
         loss_module,
         config=config,
         device=device,
-        device_ids=device_ids,
+        local_rank=config.local_rank,
         data_loader_A=dataloaders["train_loader_A"],
         data_loader_B=dataloaders["train_loader_B"],
         valid_data_loader_A=dataloaders["val_loader_A"],
@@ -43,7 +43,12 @@ def main(config):
 
 
 if __name__ == "__main__":
-    args = argparse.ArgumentParser(description="PyTorch Template")
+    args = argparse.ArgumentParser(description="Train img2img options")
+    args.add_argument(
+        "--local_rank",
+        type=int,
+        help="rank for DDP",
+    )
     args.add_argument(
         "-c",
         "--config",

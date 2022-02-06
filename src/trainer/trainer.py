@@ -19,7 +19,7 @@ class Trainer(BaseTrainer):
         criterion,
         config,
         device,
-        device_ids,
+        local_rank,
         data_loader_A,
         data_loader_B,
         valid_data_loader_A=None,
@@ -33,7 +33,7 @@ class Trainer(BaseTrainer):
             criterion,
             config,
             device,
-            device_ids,
+            local_rank,
             adversarial,
         )
         self.skip_oom = skip_oom
@@ -60,7 +60,7 @@ class Trainer(BaseTrainer):
             "generator_loss",
             "disc_A_loss",
             "disc_B_loss",
-            "grad norm",
+            "grad_norm",
             writer=self.writer,
         )
         self.valid_metrics = MetricTracker(
@@ -171,10 +171,10 @@ class Trainer(BaseTrainer):
         name = "train" if is_train else "valid"
 
         if log:
-            self._log_img("real A " + name, real_A)
-            self._log_img("real B " + name, real_B)
-            self._log_img("fake A " + name, fake_A)
-            self._log_img("fake B " + name, fake_B)
+            self._log_img("real_A_" + name, real_A)
+            self._log_img("real_B_" + name, real_B)
+            self._log_img("fake_A_" + name, fake_A)
+            self._log_img("fake_B_" + name, fake_B)
 
         if self.adversarial:
             disc_real_A = self.disc_A(real_A)

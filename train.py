@@ -20,6 +20,7 @@ np.random.seed(SEED)
 
 def main(config):
     # setup data_loader instances
+    torch.cuda.set_device(config.local_rank)
     torch.distributed.init_process_group(backend="nccl")
 
     dataloaders = get_dataloaders(config)
@@ -82,4 +83,6 @@ if __name__ == "__main__":
         ),
     ]
     config = ConfigParser.from_args(args, options)
+    args = args.parse_args()
+    config.local_rank = args.local_rank
     main(config)

@@ -244,6 +244,8 @@ class Trainer(BaseTrainer):
             self.disc_A.eval()
             self.disc_B.eval()
 
+        self.valid_metrics.reset()
+
         with torch.no_grad():
             for batch_idx, batch in enumerate(
                 tqdm(
@@ -291,4 +293,5 @@ class Trainer(BaseTrainer):
         buf = io.BytesIO()
         plt.savefig(buf, format="png")
         buf.seek(0)
+        plt.close()
         return buf

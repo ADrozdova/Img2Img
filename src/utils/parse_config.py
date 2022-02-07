@@ -11,7 +11,7 @@ from src.utils import read_json, write_json, ROOT_PATH
 
 
 class ConfigParser:
-    def __init__(self, config, resume=None, modification=None, run_id=None):
+    def __init__(self, config, resume=None, modification=None, local_rank=-1, run_id=None):
         """
         class to parse configuration json file. Handles hyperparameters for training, initializations of modules, checkpoint saving
         and logging module.
@@ -44,7 +44,7 @@ class ConfigParser:
         # configure logging module
         setup_logging(self.log_dir)
         self.log_levels = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-        self.local_rank = -1
+        self.local_rank = local_rank
 
     @classmethod
     def from_args(cls, args, options=""):
@@ -75,8 +75,7 @@ class ConfigParser:
         modification = {
             opt.target: getattr(args, _get_opt_name(opt.flags)) for opt in options
         }
-        config.local_rank = args.local_rank        
-        return cls(config, resume, modification)
+        return cls(config, resume, modification, args.local_rank)
 
     def init_obj(self, obj_dict, module, *args, **kwargs):
         """

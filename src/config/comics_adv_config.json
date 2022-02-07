@@ -27,9 +27,11 @@
   },
   "dataset": {
     "img_folder": "/Vol1/dbstore/MDAL/HSE/face2comics_v1.0.0_by_Sxela",
+    "url": "",
     "parts_train": ["face", "comics"],
     "batch_size_train": 8,
-    "batch_size_val": 16
+    "batch_size_val": 8,
+    "valid_rate": 0.8
   },
   "optimizer": {
     "type": "Adam",
@@ -48,7 +50,7 @@
     "lambda_id": 5.0
   },
   "trainer": {
-    "epochs": 70,
+    "epochs": 101010101010101010100,
     "save_dir": "saved/",
     "save_period": 10,
     "verbosity": 2,

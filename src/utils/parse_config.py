@@ -44,7 +44,7 @@ class ConfigParser:
         # configure logging module
         setup_logging(self.log_dir)
         self.log_levels = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-        self.local_rank = 0
+        self.local_rank = -1
 
     @classmethod
     def from_args(cls, args, options=""):
@@ -75,7 +75,7 @@ class ConfigParser:
         modification = {
             opt.target: getattr(args, _get_opt_name(opt.flags)) for opt in options
         }
-        config.local_rank = args.local_rank
+        config.local_rank = args.local_rank        
         return cls(config, resume, modification)
 
     def init_obj(self, obj_dict, module, *args, **kwargs):

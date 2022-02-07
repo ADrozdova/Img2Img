@@ -20,6 +20,8 @@ np.random.seed(SEED)
 
 def main(config):
     # setup data_loader instances
+    torch.distributed.init_process_group(backend="nccl")
+
     dataloaders = get_dataloaders(config)
 
     # prepare for (multi-device) GPU training

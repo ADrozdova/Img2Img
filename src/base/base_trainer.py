@@ -18,7 +18,6 @@ class BaseTrainer:
         self.config = config
         self.logger = config.get_logger("trainer", config["trainer"]["verbosity"])
 
-        torch.distributed.init_process_group(backend="nccl")
         self.local_rank = local_rank
 
         self.gen_A, self.gen_B = init_gen(config, device, local_rank)

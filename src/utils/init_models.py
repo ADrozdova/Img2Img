@@ -7,7 +7,8 @@ def init_gen(config, device, local_rank):
     gen_B = config.init_obj(config["generator"], module_arch)
     gen_A = config.init_obj(config["generator"], module_arch)
 
-    logger.info(gen_A)
+    if local_rank == 0:
+        logger.info(gen_A)
 
     gen_B = gen_B.to(device)
     gen_A = gen_A.to(device)
@@ -27,7 +28,8 @@ def init_disc(config, device, local_rank):
     disc_A = config.init_obj(config["discriminator"], module_arch)
     disc_B = config.init_obj(config["discriminator"], module_arch)
 
-    logger.info(disc_A)
+    if local_rank == 0:
+        logger.info(disc_A)
 
     disc_A = disc_A.to(device)
     disc_B = disc_B.to(device)

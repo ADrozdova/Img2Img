@@ -83,6 +83,4 @@ if __name__ == "__main__":
         ),
     ]
     config = ConfigParser.from_args(args, options)
-    args = args.parse_args()
-    config.local_rank = args.local_rank
     main(config)

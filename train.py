@@ -25,13 +25,8 @@ def main(config):
 
     dataloaders = get_dataloaders(config)
 
-<<<<<<< HEAD
     # prepare for GPU training
     device = prepare_device(config.local_rank)
-=======
-    # prepare for (multi-device) GPU training
-    device = prepare_device(config["n_gpu"])
->>>>>>> 7580b6cc4599b81bf8c8d12ebf1b3f4fac232a9e
 
     loss_module = config.init_obj(config["loss"], module_loss).to(device)
 

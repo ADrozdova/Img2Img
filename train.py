@@ -39,6 +39,7 @@ def main(config):
         data_loader_B=dataloaders["train_loader_B"],
         valid_data_loader_A=dataloaders["val_loader_A"],
         valid_data_loader_B=dataloaders["val_loader_B"],
+        skip_oom=False,
         adversarial=loss_module.adversarial,
     )
 

@@ -156,17 +156,12 @@ class Trainer(BaseTrainer):
 
     def process_batch(self, batch, is_train: bool, metrics: MetricTracker, log=False):
         real_A, real_B = batch
+
         real_A = self.move_batch_to_device(real_A, self.device)
         real_B = self.move_batch_to_device(real_B, self.device)
 
         fake_B = self.gen_B(real_A)
-        recon_A = self.gen_A(fake_B)
-
         fake_A = self.gen_A(real_B)
-        recon_B = self.gen_B(fake_A)
-
-        id_A = self.gen_A(real_A)
-        id_B = self.gen_B(real_B)
 
         name = "train" if is_train else "valid"
 
@@ -182,25 +177,36 @@ class Trainer(BaseTrainer):
 
             fake_A_detached = fake_A.clone().detach()
             disc_fake_A_detached = self.disc_A(fake_A_detached)
-
-            disc_real_B = self.disc_A(real_B)
-            disc_fake_B = self.disc_A(fake_B)
-
-            fake_B_detached = fake_B.clone().detach()
-            disc_fake_B_detached = self.disc_A(fake_B_detached)
         else:
             (
                 disc_real_A,
                 disc_fake_A,
-                disc_real_B,
-                disc_fake_B,
                 disc_fake_A_detached,
-                disc_fake_B_detached,
-            ) = (None, None, None, None, None, None)
+            ) = (None, None, None)
+
+        id_A = self.gen_A(real_A)
+        recon_A = self.gen_A(fake_B)
 
         id_A_loss, cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(
             id_A, recon_A, real_A, disc_real_A, disc_fake_A, disc_fake_A_detached
         )
+
+        id_B = self.gen_B(real_B)
+        recon_B = self.gen_B(fake_A)
+
+        if self.adversarial:
+            disc_real_B = self.disc_A(real_B)
+            disc_fake_B = self.disc_A(fake_B)
+            fake_B_detached = fake_B.clone().detach()
+            disc_fake_B_detached = self.disc_A(fake_B_detached)
+
+        else:
+            (
+                disc_real_B,
+                disc_fake_B,
+                disc_fake_B_detached,
+            ) = (None, None, None)
+
         id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(
             id_B, recon_B, real_B, disc_real_B, disc_fake_B, disc_fake_B_detached
         )

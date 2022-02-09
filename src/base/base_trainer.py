@@ -219,10 +219,10 @@ class BaseTrainer:
                 "checkpoint. This may yield an exception while state_dict is being loaded."
             )
         self.gen_A.load_state_dict(
-            checkpoint["state_dict_gen_A"], map_location=self.device
+            checkpoint["state_dict_gen_A"]
         )
         self.gen_B.load_state_dict(
-            checkpoint["state_dict_gen_B"], map_location=self.device
+            checkpoint["state_dict_gen_B"]
         )
 
         self.gen_A = torch.nn.parallel.DistributedDataParallel(
@@ -239,10 +239,10 @@ class BaseTrainer:
 
         if self.adversarial:
             self.disc_A.load_state_dict(
-                checkpoint["state_dict_disc_A"], map_location=self.device
+                checkpoint["state_dict_disc_A"]
             )
             self.disc_B.load_state_dict(
-                checkpoint["state_dict_disc_B"], map_location=self.device
+                checkpoint["state_dict_disc_B"]
             )
 
             self.disc_A = torch.nn.parallel.DistributedDataParallel(
@@ -255,7 +255,6 @@ class BaseTrainer:
         # load optimizer state from checkpoint only when optimizer type is not changed.
         if (
             checkpoint["config"]["optimizer"] != self.config["optimizer"]
-            or checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
         ):
             self.logger.warning(
                 "Warning: Optimizer or lr_scheduler given in config file is different "

@@ -3,6 +3,7 @@ import collections
 
 import numpy as np
 import torch
+import os
 
 import src.loss as module_loss
 from src.datasets.utils import get_dataloaders
@@ -84,4 +85,5 @@ if __name__ == "__main__":
         ),
     ]
     config = ConfigParser.from_args(args, options)
+    config.local_rank = int(os.environ["LOCAL_RANK"])
     main(config)

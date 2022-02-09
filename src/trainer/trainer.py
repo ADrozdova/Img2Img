@@ -100,6 +100,11 @@ class Trainer(BaseTrainer):
 
         gen_loss, discr_A_loss, discr_B_loss = [], [], []
 
+        if self.data_loader_A.sampler is not None:
+            self.data_loader_A.sampler.set_epoch(epoch)
+        if self.data_loader_B.sampler is not None:
+            self.data_loader_B.sampler.set_epoch(epoch)
+
         for batch_idx, batch in enumerate(
             tqdm(
                 zip(self.data_loader_A, self.data_loader_B),
@@ -250,7 +255,8 @@ class Trainer(BaseTrainer):
                     metrics=self.valid_metrics,
                     log=(batch_idx % 10 == 0),
                 )
-                self.writer.set_step(epoch * self.len_epoch, "valid")
+                if self.writer is not None:
+                    self.writer.set_step(epoch * self.len_epoch, "valid")
                 self._log_scalars(self.valid_metrics)
 
         return self.valid_metrics.result()
@@ -272,6 +278,8 @@ class Trainer(BaseTrainer):
             self.writer.add_scalar(f"{metric_name}", metric_tracker.avg(metric_name))
 
     def _log_img(self, name, image):
+        if self.writer is None:
+            return
         img = image[0].permute(1, 2, 0).detach().cpu()
         img = PIL.Image.open(self._plot_img_to_buf(img))
         self.writer.add_image(name, ToTensor()(img))

@@ -85,7 +85,7 @@ class BaseTrainer:
         self.checkpoint_dir = config.save_dir
 
         # setup visualization writer instance
-        self.writer = get_visualizer(config, self.logger, cfg_trainer["visualize"])
+        self.writer = get_visualizer(config, self.logger, cfg_trainer["visualize"]) if local_rank == 0 else None
 
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
@@ -120,9 +120,10 @@ class BaseTrainer:
             log = {"epoch": epoch}
             log.update(result)
 
-            # print logged informations to the screen
-            for key, value in log.items():
-                self.logger.info("    {:15s}: {}".format(str(key), value))
+            if self.local_rank == 0:
+                # print logged informations to the screen
+                for key, value in log.items():
+                    self.logger.info("    {:15s}: {}".format(str(key), value))
 
             # evaluate model performance according to configured metric, save best checkpoint as model_best
             best = False
@@ -194,6 +195,7 @@ class BaseTrainer:
         filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
         if not (only_best and save_best):
             torch.save(state, filename)
+            torch.distributed.barrier()
             self.logger.info("Saving checkpoint: {} ...".format(filename))
         if save_best:
             best_path = str(self.checkpoint_dir / "model_best.pth")
@@ -207,17 +209,19 @@ class BaseTrainer:
         :param resume_path: Checkpoint path to be resumed
         """
         resume_path = str(resume_path)
-        self.logger.info("Loading checkpoint: {} ...".format(resume_path))
+        if self.local_rank == 0:
+            self.logger.info("Loading checkpoint: {} ...".format(resume_path))
         checkpoint = torch.load(resume_path, self.device)
         self.start_epoch = checkpoint["epoch"] + 1
         self.mnt_best = checkpoint["monitor_best"]
 
         # load architecture params from checkpoint.
         if checkpoint["config"]["generator"] != self.config["generator"]:
-            self.logger.warning(
-                "Warning: Architecture configuration given in config file is different from that of "
-                "checkpoint. This may yield an exception while state_dict is being loaded."
-            )
+            if self.local_rank == 0:
+                self.logger.warning(
+                    "Warning: Architecture configuration given in config file is different from that of "
+                    "checkpoint. This may yield an exception while state_dict is being loaded."
+                )
         self.gen_A.load_state_dict(
             checkpoint["state_dict_gen_A"]
         )
@@ -232,10 +236,11 @@ class BaseTrainer:
             self.gen_B, device_ids=[self.local_rank], output_device=self.local_rank
         )
         if checkpoint["config"]["discriminator"] != self.config["discriminator"]:
-            self.logger.warning(
-                "Warning: Architecture configuration given in config file is different from that of "
-                "checkpoint. This may yield an exception while state_dict is being loaded."
-            )
+            if self.local_rank == 0:
+                self.logger.warning(
+                    "Warning: Architecture configuration given in config file is different from that of "
+                    "checkpoint. This may yield an exception while state_dict is being loaded."
+                )
 
         if self.adversarial:
             self.disc_A.load_state_dict(
@@ -256,16 +261,17 @@ class BaseTrainer:
         if (
             checkpoint["config"]["optimizer"] != self.config["optimizer"]
         ):
-            self.logger.warning(
-                "Warning: Optimizer or lr_scheduler given in config file is different "
-                "from that of checkpoint. Optimizer parameters not being resumed."
-            )
+            if self.local_rank == 0:
+                self.logger.warning(
+                    "Warning: Optimizer or lr_scheduler given in config file is different "
+                    "from that of checkpoint. Optimizer parameters not being resumed."
+                )
         else:
             self.optimizer_G.load_state_dict(checkpoint["optimizer_G"])
             if self.adversarial:
                 self.optimizer_DA.load_state_dict(checkpoint["optimizer_DA"])
                 self.optimizer_DB.load_state_dict(checkpoint["optimizer_DB"])
-
-        self.logger.info(
-            "Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch)
-        )
+        if self.local_rank == 0:
+            self.logger.info(
+                "Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch)
+            )

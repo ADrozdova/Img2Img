@@ -96,7 +96,8 @@ class Trainer(BaseTrainer):
             self.disc_B.train()
 
         self.train_metrics.reset()
-        self.writer.add_scalar("epoch", epoch)
+        if self.local_rank == 0:
+            self.writer.add_scalar("epoch", epoch)
 
         gen_loss, discr_A_loss, discr_B_loss = [], [], []
 
@@ -123,9 +124,10 @@ class Trainer(BaseTrainer):
             discr_A_loss.append(discr_A_loss_i)
             discr_B_loss.append(discr_B_loss_i)
 
-            self.writer.add_scalar("generator_loss_train", gen_loss_i)
-            self.writer.add_scalar("disc_A_loss_train", discr_A_loss_i)
-            self.writer.add_scalar("disc_B_loss_train", discr_B_loss_i)
+            if self.local_rank == 0:
+                self.writer.add_scalar("generator_loss_train", gen_loss_i)
+                self.writer.add_scalar("disc_A_loss_train", discr_A_loss_i)
+                self.writer.add_scalar("disc_B_loss_train", discr_B_loss_i)
 
             if batch_idx >= self.len_epoch:
                 break

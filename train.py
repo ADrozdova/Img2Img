@@ -1,9 +1,10 @@
 import argparse
 import collections
+import os
+from datetime import timedelta
 
 import numpy as np
 import torch
-import os
 
 import src.loss as module_loss
 from src.datasets.utils import get_dataloaders
@@ -22,7 +23,7 @@ np.random.seed(SEED)
 def main(config):
     # setup data_loader instances
     torch.cuda.set_device(config.local_rank)
-    torch.distributed.init_process_group(backend="nccl")
+    torch.distributed.init_process_group(backend="nccl", timeout=timedelta(0, 2*1800))
 
     dataloaders = get_dataloaders(config)
 
@@ -84,6 +85,5 @@ if __name__ == "__main__":
             ["--bs", "--batch_size"], type=int, target="data_loader;args;batch_size"
         ),
     ]
-    config = ConfigParser.from_args(args, options)
-    config.local_rank = int(os.environ["LOCAL_RANK"])
+    config = ConfigParser.from_args(args, options, int(os.environ["LOCAL_RANK"]))
     main(config)

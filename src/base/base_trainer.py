@@ -85,7 +85,11 @@ class BaseTrainer:
         self.checkpoint_dir = config.save_dir
 
         # setup visualization writer instance
-        self.writer = get_visualizer(config, self.logger, cfg_trainer["visualize"]) if local_rank == 0 else None
+        self.writer = (
+            get_visualizer(config, self.logger, cfg_trainer["visualize"])
+            if local_rank == 0
+            else None
+        )
 
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
@@ -229,19 +233,9 @@ class BaseTrainer:
             self.gen_B, device_ids=[self.local_rank], output_device=self.local_rank
         )
 
-        self.gen_A.load_state_dict(
-            checkpoint["state_dict_gen_A"]
-        )
-        self.gen_B.load_state_dict(
-            checkpoint["state_dict_gen_B"]
-        )
+        self.gen_A.load_state_dict(checkpoint["state_dict_gen_A"])
+        self.gen_B.load_state_dict(checkpoint["state_dict_gen_B"])
 
-        #self.gen_A = torch.nn.parallel.DistributedDataParallel(
-        #    self.gen_A, device_ids=[self.local_rank], output_device=self.local_rank
-        #)
-        #self.gen_B = torch.nn.parallel.DistributedDataParallel(
-        #    self.gen_B, device_ids=[self.local_rank], output_device=self.local_rank
-        #)
         if checkpoint["config"]["discriminator"] != self.config["discriminator"]:
             if self.local_rank == 0:
                 self.logger.warning(
@@ -256,24 +250,11 @@ class BaseTrainer:
             self.disc_B = torch.nn.parallel.DistributedDataParallel(
                 self.disc_B, device_ids=[self.local_rank], output_device=self.local_rank
             )
-            self.disc_A.load_state_dict(
-                checkpoint["state_dict_disc_A"]
-            )
-            self.disc_B.load_state_dict(
-                checkpoint["state_dict_disc_B"]
-            )
-
-            #self.disc_A = torch.nn.parallel.DistributedDataParallel(
-            #    self.disc_A, device_ids=[self.local_rank], output_device=self.local_rank
-            #)
-            #self.disc_B = torch.nn.parallel.DistributedDataParallel(
-            #    self.disc_B, device_ids=[self.local_rank], output_device=self.local_rank
-            #)
+            self.disc_A.load_state_dict(checkpoint["state_dict_disc_A"])
+            self.disc_B.load_state_dict(checkpoint["state_dict_disc_B"])
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
-        if (
-            checkpoint["config"]["optimizer"] != self.config["optimizer"]
-        ):
+        if checkpoint["config"]["optimizer"] != self.config["optimizer"]:
             if self.local_rank == 0:
                 self.logger.warning(
                     "Warning: Optimizer or lr_scheduler given in config file is different "
@@ -286,5 +267,7 @@ class BaseTrainer:
                 self.optimizer_DB.load_state_dict(checkpoint["optimizer_DB"])
         if self.local_rank == 0:
             self.logger.info(
-                "Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch)
+                "Checkpoint loaded. Resume training from epoch {}".format(
+                    self.start_epoch
+                )
             )

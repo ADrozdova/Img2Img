@@ -50,7 +50,6 @@ class Trainer(BaseTrainer):
         self.gen_scheduler = gen_scheduler
         self.disc_scheduler = disc_scheduler
         self.log_step = config["trainer"]["log_step"]
-        self.start_epoch = 1
 
         self.epochs = config["trainer"]["epochs"]
         self.save_period = config["trainer"]["save_period"]

@@ -243,6 +243,11 @@ class Trainer(BaseTrainer):
 
         self.valid_metrics.reset()
 
+        if self.data_loader_A.sampler is not None:
+            self.data_loader_A.sampler.set_epoch(epoch)
+        if self.data_loader_B.sampler is not None:
+            self.data_loader_B.sampler.set_epoch(epoch)
+
         with torch.no_grad():
             for batch_idx, batch in enumerate(
                 tqdm(

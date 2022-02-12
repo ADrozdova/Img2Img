@@ -174,37 +174,34 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
-        if self.local_rank != 0:
-            return
+        if self.local_rank == 0:
+            arch_gen = type(self.gen_A).__name__
 
-        arch_gen = type(self.gen_A).__name__
-
-        state = {
-            "generator": arch_gen,
-            "epoch": epoch,
-            "state_dict_gen_A": self.gen_A.state_dict(),
-            "state_dict_gen_B": self.gen_B.state_dict(),
-            "state_dict_disc_A": self.disc_A.state_dict() if self.adversarial else None,
-            "state_dict_disc_B": self.disc_B.state_dict() if self.adversarial else None,
-            "optimizer_G": self.optimizer_G.state_dict(),
-            "optimizer_DA": self.optimizer_DA.state_dict()
-            if self.adversarial
-            else None,
-            "optimizer_DB": self.optimizer_DB.state_dict()
-            if self.adversarial
-            else None,
-            "monitor_best": self.mnt_best,
-            "config": self.config,
-        }
-        filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
-        if not (only_best and save_best):
-            torch.save(state, filename)
-            #torch.distributed.barrier()
-            self.logger.info("Saving checkpoint: {} ...".format(filename))
-        if save_best:
-            best_path = str(self.checkpoint_dir / "model_best.pth")
-            torch.save(state, best_path)
-            self.logger.info("Saving current best: model_best.pth ...")
+            state = {
+                "generator": arch_gen,
+                "epoch": epoch,
+                "state_dict_gen_A": self.gen_A.state_dict(),
+                "state_dict_gen_B": self.gen_B.state_dict(),
+                "state_dict_disc_A": self.disc_A.state_dict() if self.adversarial else None,
+                "state_dict_disc_B": self.disc_B.state_dict() if self.adversarial else None,
+                "optimizer_G": self.optimizer_G.state_dict(),
+                "optimizer_DA": self.optimizer_DA.state_dict()
+                if self.adversarial
+                else None,
+                "optimizer_DB": self.optimizer_DB.state_dict()
+                if self.adversarial
+                else None,
+                "monitor_best": self.mnt_best,
+                "config": self.config,
+            }
+            filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
+            if not (only_best and save_best):
+                torch.save(state, filename)
+                self.logger.info("Saving checkpoint: {} ...".format(filename))
+            if save_best:
+                best_path = str(self.checkpoint_dir / "model_best.pth")
+                torch.save(state, best_path)
+                self.logger.info("Saving current best: model_best.pth ...")
 
     def _resume_checkpoint(self, resume_path):
         """

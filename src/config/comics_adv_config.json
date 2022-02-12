@@ -53,10 +53,9 @@
   "trainer": {
     "epochs": 50,
     "save_dir": "saved/",
-    "save_period": 10,
+    "save_period": 1,
     "verbosity": 2,
     "log_step": 10,
-    "monitor": "min generator_loss",
     "early_stop": 100,
     "visualize": "tensorboard"
   }

@@ -140,7 +140,7 @@ class Trainer(BaseTrainer):
 
         if self.do_validation and (self.local_rank == 0 or self.config["dataset"]["ddp_val"]):
             val_log = self._valid_epoch(epoch)
-            log.update(**{"val_" + k: v for k, v in val_log.sitems()})
+            log.update(**{"val_" + k: v for k, v in val_log.items()})
 
         return log
 

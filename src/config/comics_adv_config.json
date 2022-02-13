@@ -26,9 +26,10 @@
     }
   },
   "dataset": {
-    "img_folder": "/Vol1/dbstore/MDAL/HSE/face2comics_v1.0.0_by_Sxela",
+    "img_folder": "/Vol1/dbstore/MDAL/HSE/comics_split",
     "url": "",
-    "parts_train": ["face", "comics"],
+    "parts_train": ["train/face", "train/comics"],
+    "parts_val": ["val/face", "val/comics"],
     "batch_size_train": 2,
     "batch_size_val": 16,
     "valid_rate": 0.8,

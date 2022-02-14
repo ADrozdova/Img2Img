@@ -120,11 +120,9 @@ class Trainer(BaseTrainer):
                 log=(batch_idx % 10 == 0),
                 gen_step=(batch_idx % 2 == 0) or not self.adversarial
             )
-            gen_loss.append(gen_loss_i)
-            discr_A_loss.append(discr_A_loss_i)
-            discr_B_loss.append(discr_B_loss_i)
 
-            if self.local_rank == 0:
+            if self.local_rank == 0 and batch_idx % self.log_step == 0:
+                self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
                 self.writer.add_scalar("generator_loss_train", gen_loss_i)
                 self.writer.add_scalar("disc_A_loss_train", discr_A_loss_i)
                 self.writer.add_scalar("disc_B_loss_train", discr_B_loss_i)

@@ -118,6 +118,7 @@ class Trainer(BaseTrainer):
                 is_train=True,
                 metrics=self.train_metrics,
                 log=(batch_idx % 10 == 0),
+                gen_step=(batch_idx % 2 == 0) or not self.adversarial
             )
             gen_loss.append(gen_loss_i)
             discr_A_loss.append(discr_A_loss_i)
@@ -144,7 +145,7 @@ class Trainer(BaseTrainer):
 
         return log
 
-    def process_batch(self, batch, is_train: bool, metrics: MetricTracker, log=False):
+    def process_batch(self, batch, is_train: bool, metrics: MetricTracker, log=False, gen_step=True):
         real_A, real_B = batch
 
         real_A = self.move_batch_to_device(real_A, self.device)
@@ -174,14 +175,12 @@ class Trainer(BaseTrainer):
                 disc_fake_A_detached,
             ) = (None, None, None)
 
-        id_A = self.gen_A(real_A)
         recon_A = self.gen_A(fake_B)
 
-        id_A_loss, cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(
-            id_A, recon_A, real_A, disc_real_A, disc_fake_A, disc_fake_A_detached
+        cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(
+            recon_A, real_A, disc_real_A, disc_fake_A, disc_fake_A_detached
         )
 
-        id_B = self.gen_B(real_B)
         recon_B = self.gen_B(fake_A)
 
         if self.adversarial:
@@ -197,24 +196,24 @@ class Trainer(BaseTrainer):
                 disc_fake_B_detached,
             ) = (None, None, None)
 
-        id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(
-            id_B, recon_B, real_B, disc_real_B, disc_fake_B, disc_fake_B_detached
+        cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(
+            recon_B, real_B, disc_real_B, disc_fake_B, disc_fake_B_detached
         )
 
         gen_loss = (
-            self.config["loss"]["lambda_id"] * (id_A_loss + id_B_loss)
-            + self.config["loss"]["lambda_cyc"] * (cycle_A_loss + cycle_B_loss)
+            self.config["loss"]["lambda_cyc"] * (cycle_A_loss + cycle_B_loss)
         ) * 0.5
 
         if self.adversarial:
             gen_loss += (gen_A_loss + gen_B_loss) * 0.5
 
         if is_train:
-            self.optimizer_G.zero_grad()
-            gen_loss.backward()
-            self.optimizer_G.step()
+            if gen_step:
+                self.optimizer_G.zero_grad()
+                gen_loss.backward()
+                self.optimizer_G.step()
 
-            if self.adversarial:
+            if self.adversarial and not gen_step:
                 self.optimizer_DA.zero_grad()
                 self.optimizer_DB.zero_grad()
 

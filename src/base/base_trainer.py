@@ -37,7 +37,7 @@ class BaseTrainer:
             itertools.chain(self.gen_A.parameters(), self.gen_B.parameters()),
         )
         self.optimizer_G = config.init_obj(
-            config["optimizer"], torch.optim, trainable_params
+            config["optimizer_gen"], torch.optim, trainable_params
         )
 
         if adversarial:
@@ -45,7 +45,7 @@ class BaseTrainer:
                 lambda p: p.requires_grad, self.disc_A.parameters()
             )
             self.optimizer_DA = config.init_obj(
-                config["optimizer"], torch.optim, trainable_params
+                config["optimizer_disc"], torch.optim, trainable_params
             )
 
             trainable_params = filter(

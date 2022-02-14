@@ -7,7 +7,6 @@ class CycleGanLoss(nn.Module):
         super(CycleGanLoss, self).__init__()
         self.device = None
         self.criterion_cycle = nn.L1Loss() if "cycle" in types else None
-        self.criterion_id = nn.L1Loss() if "id" in types else None
         self.adversarial = "adversarial" in types
         self.adv_loss = AdvLoss(discr_loss_coef) if self.adversarial else None
 
@@ -19,14 +18,12 @@ class CycleGanLoss(nn.Module):
 
     def forward(
         self,
-        id_img,
         recon_img,
         real_img,
         discr_real_out=None,
         discr_fake_out=None,
         discr_fake_out_detached=None,
     ):
-        id_loss = self.criterion_id(id_img, real_img)
         cycle_loss = self.criterion_cycle(recon_img, real_img)
         discr_loss, gen_loss = None, None
         if self.adv_loss is not None:
@@ -42,7 +39,7 @@ class CycleGanLoss(nn.Module):
                 discr_real_out, discr_fake_out, discr_fake_out_detached
             )
 
-        return id_loss, cycle_loss, discr_loss, gen_loss
+        return cycle_loss, discr_loss, gen_loss
 
 
 class AdvLoss(nn.Module):

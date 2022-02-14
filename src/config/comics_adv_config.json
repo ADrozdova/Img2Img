@@ -38,7 +38,14 @@
     "num_workers_train": 0,
     "num_workers_val": 0
   },
-  "optimizer": {
+  "optimizer_gen": {
+    "type": "Adam",
+    "args": {
+      "lr": 4e-4,
+      "betas": [0.9, 0.999]
+    }
+  },
+  "optimizer_disc": {
     "type": "Adam",
     "args": {
       "lr": 4e-4,
@@ -48,14 +55,13 @@
   "loss": {
     "type": "CycleGanLoss",
     "args": {
-      "types": ["cycle", "id", "adversarial"],
+      "types": ["cycle", "adversarial"],
       "discr_loss_coef": 0.5
     },
-    "lambda_cyc": 10.0,
-    "lambda_id": 5.0
+    "lambda_cyc": 10.0
   },
   "trainer": {
-    "epochs": 50,
+    "epochs": 100,
     "save_dir": "saved/",
     "save_period": 1,
     "verbosity": 2,

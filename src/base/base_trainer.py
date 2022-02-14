@@ -52,7 +52,7 @@ class BaseTrainer:
                 lambda p: p.requires_grad, self.disc_B.parameters()
             )
             self.optimizer_DB = config.init_obj(
-                config["optimizer"], torch.optim, trainable_params
+                config["optimizer_disc"], torch.optim, trainable_params
             )
         else:
             self.optimizer_DA, self.optimizer_DB = None, None
@@ -182,8 +182,12 @@ class BaseTrainer:
                 "epoch": epoch,
                 "state_dict_gen_A": self.gen_A.state_dict(),
                 "state_dict_gen_B": self.gen_B.state_dict(),
-                "state_dict_disc_A": self.disc_A.state_dict() if self.adversarial else None,
-                "state_dict_disc_B": self.disc_B.state_dict() if self.adversarial else None,
+                "state_dict_disc_A": self.disc_A.state_dict()
+                if self.adversarial
+                else None,
+                "state_dict_disc_B": self.disc_B.state_dict()
+                if self.adversarial
+                else None,
                 "optimizer_G": self.optimizer_G.state_dict(),
                 "optimizer_DA": self.optimizer_DA.state_dict()
                 if self.adversarial
@@ -251,7 +255,10 @@ class BaseTrainer:
             self.disc_B.load_state_dict(checkpoint["state_dict_disc_B"])
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
-        if checkpoint["config"]["optimizer"] != self.config["optimizer"]:
+        if (
+            checkpoint["config"]["optimizer_disc"] != self.config["optimizer_disc"]
+            or checkpoint["config"]["optimizer_gen"] != self.config["optimizer_gen"]
+        ):
             if self.local_rank == 0:
                 self.logger.warning(
                     "Warning: Optimizer or lr_scheduler given in config file is different "

@@ -59,7 +59,10 @@ class Trainer(BaseTrainer):
             "generator_loss",
             "disc_A_loss",
             "disc_B_loss",
-            "grad_norm",
+            "grad_norm/gen_A",
+            "grad_norm/gen_B",
+            "grad_norm/disc_A",
+            "grad_norm/disc_B",
             writer=self.writer,
         )
         self.valid_metrics = MetricTracker(
@@ -98,8 +101,6 @@ class Trainer(BaseTrainer):
         if self.local_rank == 0:
             self.writer.add_scalar("epoch", epoch)
 
-        gen_loss, discr_A_loss, discr_B_loss = [], [], []
-
         if self.data_loader_A.sampler is not None:
             self.data_loader_A.sampler.set_epoch(epoch)
         if self.data_loader_B.sampler is not None:
@@ -112,6 +113,8 @@ class Trainer(BaseTrainer):
                 total=self.len_epoch,
             )
         ):
+            if self.local_rank == 0 and batch_idx % self.log_step == 0:
+                self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx, "train")
 
             gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
                 batch,
@@ -121,11 +124,15 @@ class Trainer(BaseTrainer):
                 gen_step=(batch_idx % 2 == 0) or not self.adversarial
             )
 
+            self.train_metrics.update("grad_norm/gen_A", self.get_grad_norm(self.gen_A))
+            self.train_metrics.update("grad_norm/gen_B", self.get_grad_norm(self.gen_B))
+            self.train_metrics.update("grad_norm/disc_A", self.get_grad_norm(self.disc_A))
+            self.train_metrics.update("grad_norm/disc_B", self.get_grad_norm(self.disc_B))
+
             if self.local_rank == 0 and batch_idx % self.log_step == 0:
-                self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
-                self.writer.add_scalar("generator_loss_train", gen_loss_i)
-                self.writer.add_scalar("disc_A_loss_train", discr_A_loss_i)
-                self.writer.add_scalar("disc_B_loss_train", discr_B_loss_i)
+                self.writer.add_scalar("generator_loss", gen_loss_i)
+                self.writer.add_scalar("disc_A_loss", discr_A_loss_i)
+                self.writer.add_scalar("disc_B_loss", discr_B_loss_i)
 
             if batch_idx >= self.len_epoch:
                 break
@@ -152,13 +159,11 @@ class Trainer(BaseTrainer):
         fake_B = self.gen_B(real_A)
         fake_A = self.gen_A(real_B)
 
-        name = "train" if is_train else "valid"
-
         if log:
-            self._log_img("real_A_" + name, real_A)
-            self._log_img("real_B_" + name, real_B)
-            self._log_img("fake_A_" + name, fake_A)
-            self._log_img("fake_B_" + name, fake_B)
+            self._log_img("real_A", real_A)
+            self._log_img("real_B", real_B)
+            self._log_img("fake_A", fake_A)
+            self._log_img("fake_B", fake_B)
 
         if self.adversarial:
             disc_real_A = self.disc_A(real_A)
@@ -252,14 +257,16 @@ class Trainer(BaseTrainer):
                     total=len(self.valid_data_loader_A),
                 )
             ):
+                if self.writer is not None:
+                    self.writer.set_step(epoch * self.len_epoch, "valid")
+
                 log = self.process_batch(
                     batch,
                     is_train=False,
                     metrics=self.valid_metrics,
                     log=(batch_idx % 10 == 0),
                 )
-                if self.writer is not None:
-                    self.writer.set_step(epoch * self.len_epoch, "valid")
+
                 self._log_scalars(self.valid_metrics)
 
         return self.valid_metrics.result()
@@ -279,6 +286,20 @@ class Trainer(BaseTrainer):
             return
         for metric_name in metric_tracker.keys():
             self.writer.add_scalar(f"{metric_name}", metric_tracker.avg(metric_name))
+
+    @torch.no_grad()
+    def get_grad_norm(self, model, norm_type=2):
+        parameters = model.parameters()
+        if isinstance(parameters, torch.Tensor):
+            parameters = [parameters]
+        parameters = [p for p in parameters if p.grad is not None]
+        total_norm = torch.norm(
+            torch.stack(
+                [torch.norm(p.grad.detach(), norm_type).cpu() for p in parameters]
+            ),
+            norm_type,
+        )
+        return total_norm.item()
 
     def _log_img(self, name, image):
         if self.writer is None:

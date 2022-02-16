@@ -41,14 +41,14 @@
   "optimizer_gen": {
     "type": "Adam",
     "args": {
-      "lr": 4e-4,
+      "lr": 4e-5,
       "betas": [0.9, 0.999]
     }
   },
   "optimizer_disc": {
     "type": "Adam",
     "args": {
-      "lr": 4e-4,
+      "lr": 4e-3,
       "betas": [0.9, 0.999]
     }
   },
@@ -58,7 +58,7 @@
       "types": ["cycle", "adversarial"],
       "discr_loss_coef": 0.5
     },
-    "lambda_cyc": 10.0
+    "lambda_cyc": 15.0
   },
   "trainer": {
     "epochs": 100,

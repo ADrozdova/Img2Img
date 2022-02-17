@@ -187,10 +187,10 @@ class Trainer(BaseTrainer):
         recon_B = self.gen_B(fake_A)
 
         if self.adversarial:
-            disc_real_B = self.disc_A(real_B)
-            disc_fake_B = self.disc_A(fake_B)
+            disc_real_B = self.disc_B(real_B)
+            disc_fake_B = self.disc_B(fake_B)
             fake_B_detached = fake_B.clone().detach()
-            disc_fake_B_detached = self.disc_A(fake_B_detached)
+            disc_fake_B_detached = self.disc_B(fake_B_detached)
 
         else:
             (

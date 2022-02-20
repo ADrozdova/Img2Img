@@ -26,13 +26,9 @@ np.random.seed(SEED)
 
 
 def main(config):
-    device, device_ids = prepare_device(config["n_gpu"])
+    device, device_ids = prepare_device(config.local_rank)
 
-    gen_A, gen_B = init_gen(config, device)
-
-    if len(device_ids) > 1:
-        gen_B = torch.nn.DataParallel(gen_B, device_ids=device_ids)
-        gen_A = torch.nn.DataParallel(gen_A, device_ids=device_ids)
+    gen_A, gen_B = init_gen(config, device, config.local_rank)
 
     params = config["test"]
 
@@ -124,5 +120,5 @@ if __name__ == "__main__":
         help="indices of GPUs to enable (default: all)",
     )
 
-    config = ConfigParser.from_args(args)
+    config = ConfigParser.from_args(args, local_rank=int(os.environ["LOCAL_RANK"]))
     main(config)

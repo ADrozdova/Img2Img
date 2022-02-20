@@ -46,8 +46,10 @@ def main(config):
     if "resize" in params:
         resize = params["resize"]
 
-    run_model(gen_A, params["img_folder_A"], params["save_dir_B"], params["save_dir_A_true"], device, resize)
-    run_model(gen_B, params["img_folder_B"], params["save_dir_A"], params["save_dir_B_true"], device, resize)
+    if "img_folder_A" in params:
+        run_model(gen_A, params["img_folder_A"], params["save_dir_B"], params["save_dir_A_true"], device, resize)
+    if "img_folder_B" in params:
+        run_model(gen_B, params["img_folder_B"], params["save_dir_A"], params["save_dir_B_true"], device, resize)
 
 
 def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
@@ -69,11 +71,13 @@ def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
             desc="test",
             total=len(dataloader),
     ):
-        file, image = batch
-        image = image.to(device)
-        result = model(image).squeeze(0)
-        img_to_jpeg(result, os.path.join(save_dir, file[0]))
-        img_to_jpeg(image.squeeze(0), os.path.join(save_dir_true, file[0]))
+        files, images = batch
+        images = images.to(device)
+        result = model(images)
+
+        for i in range(len(result)):
+            img_to_jpeg(result[i], os.path.join(save_dir, files[i]))
+            img_to_jpeg(images[i], os.path.join(save_dir_true, files[i]))
 
 
 if __name__ == "__main__":

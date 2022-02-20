@@ -1,0 +1,60 @@
+{
+  "name": "comics adv config",
+  "n_gpu": 1,
+  "preprocessing": {
+  },
+  "generator": {
+    "type": "Generator",
+    "args": {
+      "in_size": 3,
+      "n_filter": 64,
+      "n_blocks": 6,
+      "enc_kernels": [7, 3, 3],
+      "enc_stride": 1,
+      "enc_padding": [0, 1, 1],
+      "dec_kernels": [3, 3],
+      "dec_stride": 2,
+      "dec_padding": [1, 1]
+    }
+  },
+  "discriminator": {
+    "type": "Discriminator",
+    "args": {
+      "channels": [3, 64, 128, 256, 512],
+      "kernel_sz": 4,
+      "padding": 1
+    }
+  },
+  "dataset": {
+    "img_folder": "/Vol1/dbstore/MDAL/HSE/comics_split",
+    "url": "",
+    "parts_train": ["train/face", "train/comics"],
+    "parts_val": ["val/face", "val/comics"],
+    "batch_size_train": 4,
+    "batch_size_val": 32,
+    "valid_rate": 0.8,
+    "resize": 128,
+    "ddp_val": true,
+    "num_workers_train": 0,
+    "num_workers_val": 0
+  },
+  "trainer": {
+    "epochs": 200,
+    "save_dir": "saved/",
+    "save_period": 1,
+    "verbosity": 2,
+    "log_step": 10,
+    "early_stop": 100,
+    "visualize": "tensorboard"
+  },
+  "test": {
+    "checkpoint_file": "./checkpoint-epoch200.pth",
+    "save_dir_A": "./test_outputs/partA",
+    "save_dir_B": "./test_outputs/partB",
+    "save_dir_A_true": "./test_true/partA",
+    "save_dir_B_true": "./test_true/partB",
+    "img_folder_A": "/Vol0/user/a.drozdova/Img2Img/test_dataset",
+    "resize": 128,
+    "batch_size": 32
+  }
+}

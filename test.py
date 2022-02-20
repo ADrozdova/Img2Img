@@ -26,7 +26,7 @@ np.random.seed(SEED)
 
 
 def main(config):
-    device, device_ids = prepare_device(config.local_rank)
+    device = prepare_device(config.local_rank)
 
     gen_A, gen_B = init_gen(config, device, config.local_rank)
 

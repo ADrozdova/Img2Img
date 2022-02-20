@@ -34,9 +34,9 @@ def main(config):
     params = config["test"]
 
     checkpoint = torch.load(params["checkpoint_file"])
-    state_dict = checkpoint["state_dict_gen_a"]
+    state_dict = checkpoint["state_dict_gen_A"]
     gen_A.load_state_dict(state_dict)
-    state_dict = checkpoint["state_dict_gen_b"]
+    state_dict = checkpoint["state_dict_gen_B"]
     gen_B.load_state_dict(state_dict)
 
     resize = None

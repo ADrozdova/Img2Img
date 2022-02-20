@@ -27,6 +27,7 @@ np.random.seed(SEED)
 
 def main(config):
     device = prepare_device(config.local_rank)
+    torch.distributed.init_process_group(backend="nccl")
 
     gen_A, gen_B = init_gen(config, device, config.local_rank)
 

@@ -34,6 +34,14 @@ def main(config):
     params = config["test"]
 
     checkpoint = torch.load(params["checkpoint_file"])
+
+    gen_A = torch.nn.parallel.DistributedDataParallel(
+        gen_A, device_ids=[config.local_rank], output_device=config.local_rank
+    )
+    gen_B = torch.nn.parallel.DistributedDataParallel(
+        gen_B, device_ids=[config.local_rank], output_device=config.local_rank
+    )
+
     state_dict = checkpoint["state_dict_gen_A"]
     gen_A.load_state_dict(state_dict)
     state_dict = checkpoint["state_dict_gen_B"]

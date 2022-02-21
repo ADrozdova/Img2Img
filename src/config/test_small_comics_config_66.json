@@ -48,13 +48,13 @@
     "visualize": "tensorboard"
   },
   "test": {
-    "checkpoint_file": "./checkpoint-epoch200.pth",
-    "save_dir_A": "./test_outputs_200_256_test/partA",
-    "save_dir_B": "./test_outputs_200_256_test/partB",
-    "save_dir_A_true": "./test_true_200_256_test/partA",
-    "save_dir_B_true": "./test_true_200_256_test/partB",
+    "checkpoint_file": "./checkpoint-epoch66.pth",
+    "save_dir_A": "./test_outputs_66_512/partA",
+    "save_dir_B": "./test_outputs_66_512/partB",
+    "save_dir_A_true": "./test_true_66_512/partA",
+    "save_dir_B_true": "./test_true_66_512/partB",
     "img_folder_A": "/Vol0/user/a.drozdova/Img2Img/test_dataset",
-    "resize": 256,
+    "resize": 512,
     "batch_size": 1
   }
 }

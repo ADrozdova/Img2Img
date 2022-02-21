@@ -53,7 +53,7 @@ def main(config):
 
     if "img_folder_A" in params:
         run_model(
-            gen_A,
+            gen_B,
             params["img_folder_A"],
             params["save_dir_B"],
             params["save_dir_A_true"],
@@ -63,7 +63,7 @@ def main(config):
         )
     if "img_folder_B" in params:
         run_model(
-            gen_B,
+            gen_A,
             params["img_folder_B"],
             params["save_dir_A"],
             params["save_dir_B_true"],

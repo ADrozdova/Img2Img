@@ -99,6 +99,12 @@ def run_model(
         files, images = batch
         images = images.to(device)
         result = model(images)
+        result = torch.clamp(result, min=0.0, max=1.0)
+        
+        if batch_idx == 0:
+            print(result[0])
+            print("TORCH MIN", torch.min(result[0]))
+            print("TORCH MAX", torch.max(result[0]))
 
         for i in range(len(result)):
             img_to_jpeg(result[i], os.path.join(save_dir, files[i]))

@@ -49,12 +49,12 @@
   },
   "test": {
     "checkpoint_file": "./checkpoint-epoch66.pth",
-    "save_dir_A": "./test_outputs_66_512/partA",
-    "save_dir_B": "./test_outputs_66_512/partB",
-    "save_dir_A_true": "./test_true_66_512/partA",
-    "save_dir_B_true": "./test_true_66_512/partB",
+    "save_dir_A": "./test_outputs_66_256/partA",
+    "save_dir_B": "./test_outputs_66_256/partB",
+    "save_dir_A_true": "./test_true_66_256/partA",
+    "save_dir_B_true": "./test_true_66_256/partB",
     "img_folder_A": "/Vol0/user/a.drozdova/Img2Img/test_dataset",
-    "resize": 512,
+    "resize": 256,
     "batch_size": 1
   }
 }

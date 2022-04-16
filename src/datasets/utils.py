@@ -2,6 +2,9 @@ import torch
 
 from .dataset import ImageFolderDataset
 from torchvision import transforms
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader
+from .eval_sampler import DistributedEvalSampler
 
 
 def get_dataloaders(config):
@@ -60,37 +63,43 @@ def get_dataloaders(config):
         )
 
     dataloaders = dict()
-
-    dataloaders["train_loader_A"] = torch.utils.data.DataLoader(
+    sampler = DistributedSampler(train_set_A)
+    dataloaders["train_loader_A"] = DataLoader(
         dataset=train_set_A,
+        shuffle=(sampler is None),
         batch_size=params["batch_size_train"],
-        shuffle=True,
         pin_memory=True,
         num_workers=8,
+        sampler=sampler
     )
-
-    dataloaders["train_loader_B"] = torch.utils.data.DataLoader(
+    sampler = DistributedSampler(train_set_B)
+    dataloaders["train_loader_B"] = DataLoader(
         dataset=train_set_B,
+        shuffle=(sampler is None),
         batch_size=params["batch_size_train"],
-        shuffle=True,
         pin_memory=True,
         num_workers=8,
+        sampler=sampler
     )
 
-    dataloaders["val_loader_A"] = torch.utils.data.DataLoader(
+    sampler = DistributedEvalSampler(val_set_A)
+    dataloaders["val_loader_A"] = DataLoader(
         dataset=val_set_A,
+        shuffle=(sampler is None),
         batch_size=params["batch_size_val"],
-        shuffle=True,
         pin_memory=True,
         num_workers=8,
+        sampler=sampler
     )
 
-    dataloaders["val_loader_B"] = torch.utils.data.DataLoader(
+    sampler = DistributedEvalSampler(val_set_B)
+    dataloaders["val_loader_B"] = DataLoader(
         dataset=val_set_B,
+        shuffle=(sampler is None),
         batch_size=params["batch_size_val"],
-        shuffle=True,
         pin_memory=True,
         num_workers=8,
+        sampler=sampler
     )
 
     return dataloaders

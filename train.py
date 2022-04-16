@@ -1,5 +1,7 @@
 import argparse
 import collections
+import os
+from datetime import timedelta
 
 import numpy as np
 import torch
@@ -20,10 +22,13 @@ np.random.seed(SEED)
 
 def main(config):
     # setup data_loader instances
+    torch.cuda.set_device(config.local_rank)
+    torch.distributed.init_process_group(backend="nccl", timeout=timedelta(0, 2*1800))
+
     dataloaders = get_dataloaders(config)
 
-    # prepare for (multi-device) GPU training
-    device, device_ids = prepare_device(config["n_gpu"])
+    # prepare for GPU training
+    device = prepare_device(config.local_rank)
 
     loss_module = config.init_obj(config["loss"], module_loss).to(device)
 
@@ -31,11 +36,12 @@ def main(config):
         loss_module,
         config=config,
         device=device,
-        device_ids=device_ids,
+        local_rank=config.local_rank,
         data_loader_A=dataloaders["train_loader_A"],
         data_loader_B=dataloaders["train_loader_B"],
         valid_data_loader_A=dataloaders["val_loader_A"],
         valid_data_loader_B=dataloaders["val_loader_B"],
+        skip_oom=False,
         adversarial=loss_module.adversarial,
     )
 
@@ -43,7 +49,12 @@ def main(config):
 
 
 if __name__ == "__main__":
-    args = argparse.ArgumentParser(description="PyTorch Template")
+    args = argparse.ArgumentParser(description="Train img2img options")
+    args.add_argument(
+        "--local_rank",
+        type=int,
+        help="rank for DDP",
+    )
     args.add_argument(
         "-c",
         "--config",
@@ -74,5 +85,5 @@ if __name__ == "__main__":
             ["--bs", "--batch_size"], type=int, target="data_loader;args;batch_size"
         ),
     ]
-    config = ConfigParser.from_args(args, options)
+    config = ConfigParser.from_args(args, options, int(os.environ["LOCAL_RANK"]))
     main(config)

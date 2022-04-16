@@ -19,7 +19,7 @@ class Trainer(BaseTrainer):
         criterion,
         config,
         device,
-        device_ids,
+        local_rank,
         data_loader_A,
         data_loader_B,
         valid_data_loader_A=None,
@@ -33,7 +33,7 @@ class Trainer(BaseTrainer):
             criterion,
             config,
             device,
-            device_ids,
+            local_rank,
             adversarial,
         )
         self.skip_oom = skip_oom
@@ -50,7 +50,6 @@ class Trainer(BaseTrainer):
         self.gen_scheduler = gen_scheduler
         self.disc_scheduler = disc_scheduler
         self.log_step = config["trainer"]["log_step"]
-        self.start_epoch = 1
 
         self.epochs = config["trainer"]["epochs"]
         self.save_period = config["trainer"]["save_period"]
@@ -60,7 +59,7 @@ class Trainer(BaseTrainer):
             "generator_loss",
             "disc_A_loss",
             "disc_B_loss",
-            "grad norm",
+            "grad_norm",
             writer=self.writer,
         )
         self.valid_metrics = MetricTracker(
@@ -96,9 +95,15 @@ class Trainer(BaseTrainer):
             self.disc_B.train()
 
         self.train_metrics.reset()
-        self.writer.add_scalar("epoch", epoch)
+        if self.local_rank == 0:
+            self.writer.add_scalar("epoch", epoch)
 
         gen_loss, discr_A_loss, discr_B_loss = [], [], []
+
+        if self.data_loader_A.sampler is not None:
+            self.data_loader_A.sampler.set_epoch(epoch)
+        if self.data_loader_B.sampler is not None:
+            self.data_loader_B.sampler.set_epoch(epoch)
 
         for batch_idx, batch in enumerate(
             tqdm(
@@ -108,35 +113,20 @@ class Trainer(BaseTrainer):
             )
         ):
 
-            try:
-                gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
-                    batch,
-                    is_train=True,
-                    metrics=self.train_metrics,
-                    log=(batch_idx % 10 == 0),
-                )
-                gen_loss.append(gen_loss_i)
-                discr_A_loss.append(discr_A_loss_i)
-                discr_B_loss.append(discr_B_loss_i)
+            gen_loss_i, discr_A_loss_i, discr_B_loss_i = self.process_batch(
+                batch,
+                is_train=True,
+                metrics=self.train_metrics,
+                log=(batch_idx % 10 == 0),
+            )
+            gen_loss.append(gen_loss_i)
+            discr_A_loss.append(discr_A_loss_i)
+            discr_B_loss.append(discr_B_loss_i)
 
+            if self.local_rank == 0:
                 self.writer.add_scalar("generator_loss_train", gen_loss_i)
                 self.writer.add_scalar("disc_A_loss_train", discr_A_loss_i)
                 self.writer.add_scalar("disc_B_loss_train", discr_B_loss_i)
-
-            except RuntimeError as e:
-                if "out of memory" in str(e) and self.skip_oom:
-                    for p in itertools.chain(
-                        self.gen_B.parameters(),
-                        self.gen_A.parameters(),
-                        self.disc_A.parameters(),
-                        self.disc_B.parameters(),
-                    ):
-                        if p.grad is not None:
-                            del p.grad  # free some memory
-                    torch.cuda.empty_cache()
-                    continue
-                else:
-                    raise e
 
             if batch_idx >= self.len_epoch:
                 break
@@ -156,25 +146,20 @@ class Trainer(BaseTrainer):
 
     def process_batch(self, batch, is_train: bool, metrics: MetricTracker, log=False):
         real_A, real_B = batch
+
         real_A = self.move_batch_to_device(real_A, self.device)
         real_B = self.move_batch_to_device(real_B, self.device)
 
         fake_B = self.gen_B(real_A)
-        recon_A = self.gen_A(fake_B)
-
         fake_A = self.gen_A(real_B)
-        recon_B = self.gen_B(fake_A)
-
-        id_A = self.gen_A(real_A)
-        id_B = self.gen_B(real_B)
 
         name = "train" if is_train else "valid"
 
         if log:
-            self._log_img("real A " + name, real_A)
-            self._log_img("real B " + name, real_B)
-            self._log_img("fake A " + name, fake_A)
-            self._log_img("fake B " + name, fake_B)
+            self._log_img("real_A_" + name, real_A)
+            self._log_img("real_B_" + name, real_B)
+            self._log_img("fake_A_" + name, fake_A)
+            self._log_img("fake_B_" + name, fake_B)
 
         if self.adversarial:
             disc_real_A = self.disc_A(real_A)
@@ -182,25 +167,36 @@ class Trainer(BaseTrainer):
 
             fake_A_detached = fake_A.clone().detach()
             disc_fake_A_detached = self.disc_A(fake_A_detached)
-
-            disc_real_B = self.disc_A(real_B)
-            disc_fake_B = self.disc_A(fake_B)
-
-            fake_B_detached = fake_B.clone().detach()
-            disc_fake_B_detached = self.disc_A(fake_B_detached)
         else:
             (
                 disc_real_A,
                 disc_fake_A,
-                disc_real_B,
-                disc_fake_B,
                 disc_fake_A_detached,
-                disc_fake_B_detached,
-            ) = (None, None, None, None, None, None)
+            ) = (None, None, None)
+
+        id_A = self.gen_A(real_A)
+        recon_A = self.gen_A(fake_B)
 
         id_A_loss, cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(
             id_A, recon_A, real_A, disc_real_A, disc_fake_A, disc_fake_A_detached
         )
+
+        id_B = self.gen_B(real_B)
+        recon_B = self.gen_B(fake_A)
+
+        if self.adversarial:
+            disc_real_B = self.disc_A(real_B)
+            disc_fake_B = self.disc_A(fake_B)
+            fake_B_detached = fake_B.clone().detach()
+            disc_fake_B_detached = self.disc_A(fake_B_detached)
+
+        else:
+            (
+                disc_real_B,
+                disc_fake_B,
+                disc_fake_B_detached,
+            ) = (None, None, None)
+
         id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(
             id_B, recon_B, real_B, disc_real_B, disc_fake_B, disc_fake_B_detached
         )
@@ -244,6 +240,13 @@ class Trainer(BaseTrainer):
             self.disc_A.eval()
             self.disc_B.eval()
 
+        self.valid_metrics.reset()
+
+        if self.data_loader_A.sampler is not None:
+            self.data_loader_A.sampler.set_epoch(epoch)
+        if self.data_loader_B.sampler is not None:
+            self.data_loader_B.sampler.set_epoch(epoch)
+
         with torch.no_grad():
             for batch_idx, batch in enumerate(
                 tqdm(
@@ -258,7 +261,8 @@ class Trainer(BaseTrainer):
                     metrics=self.valid_metrics,
                     log=(batch_idx % 10 == 0),
                 )
-                self.writer.set_step(epoch * self.len_epoch, "valid")
+                if self.writer is not None:
+                    self.writer.set_step(epoch * self.len_epoch, "valid")
                 self._log_scalars(self.valid_metrics)
 
         return self.valid_metrics.result()
@@ -280,6 +284,8 @@ class Trainer(BaseTrainer):
             self.writer.add_scalar(f"{metric_name}", metric_tracker.avg(metric_name))
 
     def _log_img(self, name, image):
+        if self.writer is None:
+            return
         img = image[0].permute(1, 2, 0).detach().cpu()
         img = PIL.Image.open(self._plot_img_to_buf(img))
         self.writer.add_image(name, ToTensor()(img))
@@ -291,4 +297,5 @@ class Trainer(BaseTrainer):
         buf = io.BytesIO()
         plt.savefig(buf, format="png")
         buf.seek(0)
+        plt.close()
         return buf

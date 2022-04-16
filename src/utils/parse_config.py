@@ -11,7 +11,7 @@ from src.utils import read_json, write_json, ROOT_PATH
 
 
 class ConfigParser:
-    def __init__(self, config, resume=None, modification=None, run_id=None):
+    def __init__(self, config, resume=None, modification=None, local_rank=-1, run_id=None):
         """
         class to parse configuration json file. Handles hyperparameters for training, initializations of modules, checkpoint saving
         and logging module.
@@ -35,18 +35,22 @@ class ConfigParser:
 
         # make directory for saving checkpoints and log.
         exist_ok = run_id == ""
-        self.save_dir.mkdir(parents=True, exist_ok=exist_ok)
-        self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
 
-        # save updated config file to the checkpoint dir
-        write_json(self.config, self.save_dir / "checkpoint_config.json")
+        if local_rank == 0:
+            self.save_dir.mkdir(parents=True, exist_ok=exist_ok)
+            self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
 
-        # configure logging module
-        setup_logging(self.log_dir)
+            # save updated config file to the checkpoint dir
+            write_json(self.config, self.save_dir / "checkpoint_config.json")
+
+            # configure logging module
+            setup_logging(self.log_dir)
+
         self.log_levels = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+        self.local_rank = local_rank
 
     @classmethod
-    def from_args(cls, args, options=""):
+    def from_args(cls, args, options="", local_rank=-1):
         """
         Initialize this class from some cli arguments. Used in train, test.
         """
@@ -54,7 +58,6 @@ class ConfigParser:
             args.add_argument(*opt.flags, default=None, type=opt.type)
         if not isinstance(args, tuple):
             args = args.parse_args()
-
         if args.device is not None:
             os.environ["CUDA_VISIBLE_DEVICES"] = args.device
         if args.resume is not None:
@@ -75,7 +78,7 @@ class ConfigParser:
         modification = {
             opt.target: getattr(args, _get_opt_name(opt.flags)) for opt in options
         }
-        return cls(config, resume, modification)
+        return cls(config, resume, modification, local_rank)
 
     def init_obj(self, obj_dict, module, *args, **kwargs):
         """

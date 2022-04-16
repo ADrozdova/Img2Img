@@ -15,26 +15,27 @@ from torch.nn.utils import clip_grad_norm_
 
 class Trainer(BaseTrainer):
     def __init__(
-            self,
-            gen_B,
-            gen_A,
-            disc_A,
-            disc_B,
+        self,
+        criterion,
+        config,
+        device,
+        device_ids,
+        data_loader_A,
+        data_loader_B,
+        valid_data_loader_A=None,
+        valid_data_loader_B=None,
+        gen_scheduler=None,
+        disc_scheduler=None,
+        skip_oom=True,
+        adversarial=True,
+    ):
+        super().__init__(
             criterion,
-            optimizer_G,
-            optimizer_DA,
-            optimizer_DB,
             config,
             device,
-            data_loader_A,
-            data_loader_B,
-            valid_data_loader_A=None,
-            valid_data_loader_B=None,
-            gen_scheduler=None,
-            disc_scheduler=None,
-            skip_oom=True,
-    ):
-        super().__init__(gen_B, gen_A, disc_A, disc_B, criterion, optimizer_G, optimizer_DA, optimizer_DB, config, device)
+            device_ids,
+            adversarial,
+        )
         self.skip_oom = skip_oom
         self.config = config
 
@@ -48,7 +49,7 @@ class Trainer(BaseTrainer):
         self.do_validation = self.valid_data_loader_A is not None
         self.gen_scheduler = gen_scheduler
         self.disc_scheduler = disc_scheduler
-        self.log_step = 10
+        self.log_step = config["trainer"]["log_step"]
         self.start_epoch = 1
 
         self.epochs = config["trainer"]["epochs"]
@@ -56,12 +57,15 @@ class Trainer(BaseTrainer):
         self.checkpoint_dir = config.save_dir
 
         self.train_metrics = MetricTracker(
-            "generator_loss", "disc_A_loss", "disc_B_loss", "grad norm", writer=self.writer
+            "generator_loss",
+            "disc_A_loss",
+            "disc_B_loss",
+            "grad norm",
+            writer=self.writer,
         )
         self.valid_metrics = MetricTracker(
             "generator_loss", "disc_A_loss", "disc_B_loss", writer=self.writer
         )
-
 
     @staticmethod
     def move_batch_to_device(batch, device: torch.device):
@@ -76,12 +80,13 @@ class Trainer(BaseTrainer):
             clip_grad_norm_(
                 self.gen_B.parameters(), self.config["trainer"]["grad_norm_clip"]
             )
-            clip_grad_norm_(
-                self.disc_A.parameters(), self.config["trainer"]["grad_norm_clip"]
-            )
-            clip_grad_norm_(
-                self.disc_B.parameters(), self.config["trainer"]["grad_norm_clip"]
-            )
+            if self.adversarial:
+                clip_grad_norm_(
+                    self.disc_A.parameters(), self.config["trainer"]["grad_norm_clip"]
+                )
+                clip_grad_norm_(
+                    self.disc_B.parameters(), self.config["trainer"]["grad_norm_clip"]
+                )
 
     def _train_epoch(self, epoch):
         self.gen_B.train()
@@ -96,7 +101,11 @@ class Trainer(BaseTrainer):
         gen_loss, discr_A_loss, discr_B_loss = [], [], []
 
         for batch_idx, batch in enumerate(
-                tqdm(zip(self.data_loader_A, self.data_loader_B), desc="train", total=self.len_epoch)
+            tqdm(
+                zip(self.data_loader_A, self.data_loader_B),
+                desc="train",
+                total=self.len_epoch,
+            )
         ):
 
             try:
@@ -104,26 +113,24 @@ class Trainer(BaseTrainer):
                     batch,
                     is_train=True,
                     metrics=self.train_metrics,
-                    log=(batch_idx % 10 == 0)
+                    log=(batch_idx % 10 == 0),
                 )
                 gen_loss.append(gen_loss_i)
                 discr_A_loss.append(discr_A_loss_i)
                 discr_B_loss.append(discr_B_loss_i)
 
-                self.writer.add_scalar(
-                    "generator_loss_train", gen_loss_i
-                )
-                self.writer.add_scalar(
-                    "disc_A_loss_train", discr_A_loss_i
-                )
-                self.writer.add_scalar(
-                    "disc_B_loss_train", discr_B_loss_i
-                )
+                self.writer.add_scalar("generator_loss_train", gen_loss_i)
+                self.writer.add_scalar("disc_A_loss_train", discr_A_loss_i)
+                self.writer.add_scalar("disc_B_loss_train", discr_B_loss_i)
 
             except RuntimeError as e:
                 if "out of memory" in str(e) and self.skip_oom:
-                    for p in itertools.chain(self.gen_B.parameters(), self.gen_A.parameters(),
-                                             self.disc_A.parameters(), self.disc_B.parameters()):
+                    for p in itertools.chain(
+                        self.gen_B.parameters(),
+                        self.gen_A.parameters(),
+                        self.disc_A.parameters(),
+                        self.disc_B.parameters(),
+                    ):
                         if p.grad is not None:
                             del p.grad  # free some memory
                     torch.cuda.empty_cache()
@@ -169,7 +176,7 @@ class Trainer(BaseTrainer):
             self._log_img("fake A " + name, fake_A)
             self._log_img("fake B " + name, fake_B)
 
-        if self.criterion.adversarial:
+        if self.adversarial:
             disc_real_A = self.disc_A(real_A)
             disc_fake_A = self.disc_A(fake_A)
 
@@ -182,18 +189,28 @@ class Trainer(BaseTrainer):
             fake_B_detached = fake_B.clone().detach()
             disc_fake_B_detached = self.disc_A(fake_B_detached)
         else:
-            disc_real_A, disc_fake_A, disc_real_B, disc_fake_B, disc_fake_A_detached, disc_fake_B_detached =\
-                None, None, None, None, None, None
+            (
+                disc_real_A,
+                disc_fake_A,
+                disc_real_B,
+                disc_fake_B,
+                disc_fake_A_detached,
+                disc_fake_B_detached,
+            ) = (None, None, None, None, None, None)
 
-        id_A_loss, cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(id_A, recon_A, real_A, disc_real_A,
-                                                                           disc_fake_A, disc_fake_A_detached)
-        id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(id_B, recon_B, real_B, disc_real_B,
-                                                                           disc_fake_B, disc_fake_B_detached)
+        id_A_loss, cycle_A_loss, discr_A_loss, gen_B_loss = self.criterion(
+            id_A, recon_A, real_A, disc_real_A, disc_fake_A, disc_fake_A_detached
+        )
+        id_B_loss, cycle_B_loss, discr_B_loss, gen_A_loss = self.criterion(
+            id_B, recon_B, real_B, disc_real_B, disc_fake_B, disc_fake_B_detached
+        )
 
-        gen_loss = (self.config["loss"]["lambda_id"] * (id_A_loss + id_B_loss) +
-                    self.config["loss"]["lambda_cyc"] * (cycle_A_loss + cycle_B_loss)) * 0.5
+        gen_loss = (
+            self.config["loss"]["lambda_id"] * (id_A_loss + id_B_loss)
+            + self.config["loss"]["lambda_cyc"] * (cycle_A_loss + cycle_B_loss)
+        ) * 0.5
 
-        if self.criterion.adversarial:
+        if self.adversarial:
             gen_loss += (gen_A_loss + gen_B_loss) * 0.5
 
         if is_train:
@@ -201,7 +218,7 @@ class Trainer(BaseTrainer):
             gen_loss.backward()
             self.optimizer_G.step()
 
-            if self.criterion.adversarial:
+            if self.adversarial:
                 self.optimizer_DA.zero_grad()
                 self.optimizer_DB.zero_grad()
 
@@ -215,7 +232,7 @@ class Trainer(BaseTrainer):
         metrics.update("disc_A_loss", discr_A_loss.item())
         metrics.update("disc_B_loss", discr_B_loss.item())
 
-        if self.criterion.adversarial:
+        if self.adversarial:
             return gen_loss.item(), discr_A_loss.item(), discr_B_loss.item()
         else:
             return gen_loss.item(), None, None
@@ -223,20 +240,23 @@ class Trainer(BaseTrainer):
     def _valid_epoch(self, epoch):
         self.gen_B.eval()
         self.gen_A.eval()
-        if self.criterion.adversarial:
+        if self.adversarial:
             self.disc_A.eval()
             self.disc_B.eval()
 
         with torch.no_grad():
             for batch_idx, batch in enumerate(
-                    tqdm(zip(self.valid_data_loader_A, self.valid_data_loader_B), desc="valid",
-                         total=len(self.valid_data_loader_A))
+                tqdm(
+                    zip(self.valid_data_loader_A, self.valid_data_loader_B),
+                    desc="valid",
+                    total=len(self.valid_data_loader_A),
+                )
             ):
                 log = self.process_batch(
                     batch,
                     is_train=False,
                     metrics=self.valid_metrics,
-                    log=(batch_idx % 10 == 0)
+                    log=(batch_idx % 10 == 0),
                 )
                 self.writer.set_step(epoch * self.len_epoch, "valid")
                 self._log_scalars(self.valid_metrics)
@@ -266,9 +286,9 @@ class Trainer(BaseTrainer):
 
     def _plot_img_to_buf(self, img_tensor, name=None):
         plt.figure(figsize=(20, 20))
-        plt.imshow((img_tensor.numpy() * 255).astype('uint8'))
+        plt.imshow((img_tensor.numpy() * 255).astype("uint8"))
         plt.title(name)
         buf = io.BytesIO()
-        plt.savefig(buf, format='png')
+        plt.savefig(buf, format="png")
         buf.seek(0)
         return buf

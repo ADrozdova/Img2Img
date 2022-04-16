@@ -1,8 +1,9 @@
 import os
 
 import torch
-import torchvision
+import torchvision.transforms.functional as F
 from PIL import Image
+
 from src.utils.util import load_dataset
 
 
@@ -20,7 +21,7 @@ class ImageFolderDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.img_folder, self.part, self.all_imgs[idx])
-        image = torchvision.transforms.ToTensor()(Image.open(img_path))
+        image = F.to_tensor(Image.open(img_path))
         if self.transform:
             image = self.transform(image)
         return image
@@ -39,7 +40,7 @@ class TestDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.img_folder, self.all_imgs[idx])
-        image = torchvision.transforms.ToTensor()(Image.open(img_path))
+        image = F.to_tensor(Image.open(img_path))
         if self.transform:
             image = self.transform(image)
         return self.all_imgs[idx], image

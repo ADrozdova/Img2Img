@@ -6,13 +6,14 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
-# from tqdm import tqdm
+from tqdm import tqdm
 from pathlib import Path
 
 import src.model as module_arch
 from src.datasets.dataset import TestDataset
 from src.utils import prepare_device, img_to_jpeg
 from src.utils.parse_config import ConfigParser
+from src.utils.init_models import init_gen
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -25,13 +26,9 @@ np.random.seed(SEED)
 
 
 def main(config):
-    gen_B = config.init_obj(config["generator"], module_arch)
-    gen_A = config.init_obj(config["generator"], module_arch)
-
     device, device_ids = prepare_device(config["n_gpu"])
 
-    gen_B = gen_B.to(device)
-    gen_A = gen_A.to(device)
+    gen_A, gen_B = init_gen(config, device)
 
     if len(device_ids) > 1:
         gen_B = torch.nn.DataParallel(gen_B, device_ids=device_ids)
@@ -67,12 +64,11 @@ def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
 
     dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 
-    # for batch_idx, batch in tqdm(
-    #         enumerate(dataloader),
-    #         desc="test",
-    #         total=len(dataloader),
-    # ):
-    for batch_idx, batch in enumerate(dataloader):
+    for batch_idx, batch in tqdm(
+            enumerate(dataloader),
+            desc="test",
+            total=len(dataloader),
+    ):
         file, image = batch
         image = image.to(device)
         result = model(image).squeeze(0)

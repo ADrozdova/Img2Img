@@ -26,35 +26,62 @@ np.random.seed(SEED)
 
 
 def main(config):
-    device, device_ids = prepare_device(config["n_gpu"])
+    device = prepare_device(config.local_rank)
+    torch.distributed.init_process_group(backend="nccl")
 
-    gen_A, gen_B = init_gen(config, device)
+    gen_A, gen_B = init_gen(config, device, config.local_rank)
 
-    if len(device_ids) > 1:
-        gen_B = torch.nn.DataParallel(gen_B, device_ids=device_ids)
-        gen_A = torch.nn.DataParallel(gen_A, device_ids=device_ids)
+    params = config["test"]
 
-    params = config['test']
+    checkpoint = torch.load(params["checkpoint_file"])
 
-    checkpoint = torch.load(params['checkpoint_file'])
-    state_dict = checkpoint["state_dict_gen_a"]
+    gen_A = torch.nn.parallel.DistributedDataParallel(
+        gen_A, device_ids=[config.local_rank], output_device=config.local_rank
+    )
+    gen_B = torch.nn.parallel.DistributedDataParallel(
+        gen_B, device_ids=[config.local_rank], output_device=config.local_rank
+    )
+
+    state_dict = checkpoint["state_dict_gen_A"]
     gen_A.load_state_dict(state_dict)
-    state_dict = checkpoint["state_dict_gen_b"]
+    state_dict = checkpoint["state_dict_gen_B"]
     gen_B.load_state_dict(state_dict)
 
     resize = None
     if "resize" in params:
         resize = params["resize"]
 
-    run_model(gen_A, params["img_folder_A"], params["save_dir_B"], params["save_dir_A_true"], device, resize)
-    run_model(gen_B, params["img_folder_B"], params["save_dir_A"], params["save_dir_B_true"], device, resize)
+    if "img_folder_A" in params:
+        run_model(
+            gen_B,
+            params["img_folder_A"],
+            params["save_dir_B"],
+            params["save_dir_A_true"],
+            device,
+            resize,
+            params["batch_size"],
+        )
+    if "img_folder_B" in params:
+        run_model(
+            gen_A,
+            params["img_folder_B"],
+            params["save_dir_A"],
+            params["save_dir_B_true"],
+            device,
+            resize,
+            params["batch_size"],
+        )
 
 
-def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
+def run_model(
+    model, img_folder, save_dir, save_dir_true, device, resize=None, batch_size=1
+):
     if resize is not None:
-        transform = transforms.Compose([
-            transforms.Resize((resize, resize)),
-        ])
+        transform = transforms.Compose(
+            [
+                transforms.Resize((resize, resize)),
+            ]
+        )
     else:
         transform = None
     dataset = TestDataset(img_folder, transform=transform)
@@ -62,18 +89,21 @@ def run_model(model, img_folder, save_dir, save_dir_true, device, resize=None):
     Path(save_dir).mkdir(parents=True, exist_ok=True)
     Path(save_dir_true).mkdir(parents=True, exist_ok=True)
 
-    dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
+    dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size)
 
     for batch_idx, batch in tqdm(
-            enumerate(dataloader),
-            desc="test",
-            total=len(dataloader),
+        enumerate(dataloader),
+        desc="test",
+        total=len(dataloader),
     ):
-        file, image = batch
-        image = image.to(device)
-        result = model(image).squeeze(0)
-        img_to_jpeg(result, os.path.join(save_dir, file[0]))
-        img_to_jpeg(image.squeeze(0), os.path.join(save_dir_true, file[0]))
+        files, images = batch
+        images = images.to(device)
+        result = model(images)
+        result = torch.clamp(result, min=0.0, max=1.0)
+        
+        for i in range(len(result)):
+            img_to_jpeg(result[i], os.path.join(save_dir, files[i]))
+            img_to_jpeg(images[i], os.path.join(save_dir_true, files[i]))
 
 
 if __name__ == "__main__":
@@ -100,5 +130,5 @@ if __name__ == "__main__":
         help="indices of GPUs to enable (default: all)",
     )
 
-    config = ConfigParser.from_args(args)
+    config = ConfigParser.from_args(args, local_rank=int(os.environ["LOCAL_RANK"]))
     main(config)

@@ -69,7 +69,7 @@ def get_dataloaders(config):
         shuffle=(sampler is None),
         batch_size=params["batch_size_train"],
         pin_memory=True,
-        num_workers=8,
+        num_workers=params["num_workers_train"],
         sampler=sampler
     )
     sampler = DistributedSampler(train_set_B)
@@ -78,27 +78,27 @@ def get_dataloaders(config):
         shuffle=(sampler is None),
         batch_size=params["batch_size_train"],
         pin_memory=True,
-        num_workers=8,
+        num_workers=params["num_workers_train"],
         sampler=sampler
     )
 
-    sampler = DistributedEvalSampler(val_set_A)
+    sampler = DistributedEvalSampler(val_set_A) if params["ddp_val"] else None
     dataloaders["val_loader_A"] = DataLoader(
         dataset=val_set_A,
         shuffle=(sampler is None),
         batch_size=params["batch_size_val"],
         pin_memory=True,
-        num_workers=8,
+        num_workers=params["num_workers_val"],
         sampler=sampler
     )
 
-    sampler = DistributedEvalSampler(val_set_B)
+    sampler = DistributedEvalSampler(val_set_B) if params["ddp_val"] else None
     dataloaders["val_loader_B"] = DataLoader(
         dataset=val_set_B,
         shuffle=(sampler is None),
         batch_size=params["batch_size_val"],
         pin_memory=True,
-        num_workers=8,
+        num_workers=params["num_workers_val"],
         sampler=sampler
     )
 

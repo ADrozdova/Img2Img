@@ -121,7 +121,7 @@ def inference(cfg, model, test_pipeline, text_transform, vis_modes, dataset, add
 
 def main(local_rank):
     checkpoint_url = 'https://github.com/xvjiarui/GroupViT/releases/download/v1.0.0/group_vit_gcc_yfcc_30e-74d335e6.pth'
-    cfg_path = 'src/config/group_vit_gcc_yfcc_30e.yml'
+    cfg_path = 'src/configs/group_vit_gcc_yfcc_30e.yml'
     output_dir = 'demo/output'
     vis_modes = ['input_pred_label', 'final_group']
 

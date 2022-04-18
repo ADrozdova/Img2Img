@@ -57,13 +57,13 @@ class LoadImage:
 def inference(cfg, model, test_pipeline, text_transform, vis_modes, dataset, additional_classes, input_img, output_dir):
     if dataset == 'voc' or dataset == 'Pascal VOC':
         dataset_class = PascalVOCDataset
-        seg_cfg = 'segmentation/configs/_base_/datasets/pascal_voc12.py'
+        seg_cfg = 'src/segmentation/configs/_base_/datasets/pascal_voc12.py'
     elif dataset == 'coco' or dataset == 'COCO':
         dataset_class = COCOObjectDataset
-        seg_cfg = 'segmentation/configs/_base_/datasets/coco_object164k.py'
+        seg_cfg = 'src/segmentation/configs/_base_/datasets/coco_object164k.py'
     elif dataset == 'context' or dataset == 'Pascal Context':
         dataset_class = PascalContextDataset
-        seg_cfg = 'segmentation/configs/_base_/datasets/pascal_context.py'
+        seg_cfg = 'src/segmentation/configs/_base_/datasets/pascal_context.py'
     else:
         raise ValueError('Unknown dataset: {}'.format(dataset))
     with read_write(cfg):
@@ -121,7 +121,7 @@ def inference(cfg, model, test_pipeline, text_transform, vis_modes, dataset, add
 
 def main(local_rank):
     checkpoint_url = 'https://github.com/xvjiarui/GroupViT/releases/download/v1.0.0/group_vit_gcc_yfcc_30e-74d335e6.pth'
-    cfg_path = 'config/group_vit_gcc_yfcc_30e.yml'
+    cfg_path = 'src/config/group_vit_gcc_yfcc_30e.yml'
     output_dir = 'demo/output'
     vis_modes = ['input_pred_label', 'final_group']
 

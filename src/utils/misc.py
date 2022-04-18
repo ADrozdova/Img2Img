@@ -16,7 +16,7 @@ from collections import OrderedDict
 
 import torch
 import torch.distributed as dist
-from src.datasets import template_meta
+from src.datasets.imagenet_template import template_meta
 
 
 def reduce_tensor(tensor):

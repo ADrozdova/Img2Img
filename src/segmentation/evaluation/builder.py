@@ -15,7 +15,7 @@ import mmcv
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.datasets.pipelines import Compose
 from omegaconf import OmegaConf
-from utils import build_dataset_class_tokens
+from src.utils import build_dataset_class_tokens
 
 from .group_vit_seg import GroupViTSegInference
 

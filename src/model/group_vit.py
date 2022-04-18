@@ -19,10 +19,9 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from src.base.base_model import BaseModel
 
-
-from .groupvit_misc import Result, interpolate_pos_encoding
+from .builder import MODELS
+from .misc import Result, interpolate_pos_encoding
 
 
 class Mlp(nn.Module):
@@ -607,7 +606,8 @@ class PatchEmbed(nn.Module):
         return x, hw_shape
 
 
-class GroupViT(BaseModel):
+@MODELS.register_module()
+class GroupViT(nn.Module):
     r""" Group Vision Transformer
         A PyTorch impl of : `GroupViT: Semantic Segmentation Emerges from Text Supervision`  -
           https://arxiv.org/pdf/2202.11094.pdf
@@ -851,9 +851,12 @@ class GroupViT(BaseModel):
 
     def forward_image_head(self, x):
         """
+
         Args:
             x: shape [B, L, C]
+
         Returns:
+
         """
         # [B, L, C]
         x = self.avgpool(x.transpose(1, 2))  # B C 1

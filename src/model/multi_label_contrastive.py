@@ -20,7 +20,8 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 from timm.loss import SoftTargetCrossEntropy
 
-from .groupvit_misc import Result
+from .builder import MODELS
+from .misc import Result
 
 
 def dist_collect(x):
@@ -78,6 +79,7 @@ class ProjectMLP(nn.Module):
         return x
 
 
+@MODELS.register_module()
 class MultiLabelContrastive(nn.Module):
 
     def __init__(self,

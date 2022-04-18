@@ -1,5 +1,3 @@
-from .util import *
-
 # -------------------------------------------------------------------------
 # Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
@@ -13,15 +11,26 @@ from .util import *
 # Written by Jiarui Xu
 # -------------------------------------------------------------------------
 
-from .checkpoint import auto_resume_helper, load_checkpoint, save_checkpoint
-from .config import get_config
-from .logger import get_logger
-from .lr_scheduler import build_scheduler
-from .misc import build_dataset_class_tokens, data2cuda, get_batch_size, get_grad_norm, parse_losses, reduce_tensor
-from .optimizer import build_optimizer
+import torch
+from mmcv.parallel import DataContainer as DC
 
-__all__ = [
-    'get_config', 'get_logger', 'build_optimizer', 'build_scheduler', 'load_checkpoint', 'save_checkpoint',
-    'auto_resume_helper', 'reduce_tensor', 'get_grad_norm', 'get_batch_size', 'data2cuda', 'parse_losses',
-    'build_dataset_class_tokens'
-]
+
+class ToDataContainer(object):
+    """Convert results to :obj:`mmcv.DataContainer`"""
+
+    def __call__(self, sample):
+        """Call function to convert data in results to
+        :obj:`mmcv.DataContainer`.
+
+        Args:
+            sample (torch.Tensor): Input sample.
+
+        Returns:
+            DataContainer
+        """
+        if isinstance(sample, int):
+            sample = torch.tensor(sample)
+        return DC(sample, stack=True, pad_dims=None)
+
+    def __repr__(self):
+        return self.__class__.__name__

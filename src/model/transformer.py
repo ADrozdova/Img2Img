@@ -28,7 +28,8 @@ import torch
 import torch.utils.checkpoint as checkpoint
 from torch import nn
 
-from .groupvit_misc import Result
+from .builder import MODELS
+from .misc import Result
 from .utils import ResidualAttentionBlock
 
 
@@ -59,7 +60,9 @@ class Transformer(nn.Module):
         return x
 
 
+@MODELS.register_module()
 class TextTransformer(nn.Module):
+
     def __init__(
         self,
         context_length: int,

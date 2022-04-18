@@ -1,23 +1,23 @@
+import os
 import os.path as osp
 import warnings
 from collections import namedtuple
-import os
+
 import mmcv
 import numpy as np
 import torch
-from src.datasets import build_text_transform
 from mmcv.cnn.utils import revert_sync_batchnorm
 from mmcv.image import tensor2imgs
 from mmcv.parallel import collate, scatter
-from src.model import build_model
 from omegaconf import read_write
-from src.segmentation.datasets import (COCOObjectDataset, PascalContextDataset,
-                                   PascalVOCDataset)
-from src.segmentation.evaluation import (GROUP_PALETTE, build_seg_demo_pipeline,
-                                     build_seg_inference)
-from utils import get_config, load_checkpoint
 
-from src.utils import prepare_device
+from src.datasets import build_text_transform
+from src.model import build_model
+from src.segmentation.datasets import (COCOObjectDataset, PascalContextDataset,
+                                       PascalVOCDataset)
+from src.segmentation.evaluation import (GROUP_PALETTE, build_seg_demo_pipeline,
+                                         build_seg_inference)
+from src.utils import get_config, load_checkpoint, prepare_device
 
 warnings.filterwarnings("ignore", category=UserWarning)
 

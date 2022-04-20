@@ -5,6 +5,7 @@ from .group_vit import GroupViT
 from .multi_label_contrastive import MultiLabelContrastive
 from .transformer import TextTransformer
 from .builder import build_model
+from .styletransfer_vgg import VGG
 
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "MultiLabelContrastive",
     "GroupViT",
     "TextTransformer",
+    "VGG"
 ]

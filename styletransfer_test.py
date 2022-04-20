@@ -48,11 +48,12 @@ local_rank = int(os.environ["LOCAL_RANK"])
 device = prepare_device(local_rank)
 torch.distributed.init_process_group(backend="nccl")
 
-vgg = torch.nn.parallel.DistributedDataParallel(
-    vgg, device_ids=[local_rank], output_device=local_rank
-)
+#vgg = torch.nn.parallel.DistributedDataParallel(
+#    vgg, device_ids=[local_rank], output_device=local_rank
+#)
+vgg = vgg.to(device)
 
-image_dir = "/images"
+image_dir = "./images/"
 
 # load images, ordered as [style_image, content_image]
 img_dirs = [image_dir, image_dir]
@@ -64,6 +65,7 @@ imgs_torch = [img.unsqueeze(0).to(device) for img in imgs_torch]
 style_image, content_image = imgs_torch
 
 opt_img = content_image.data.clone()
+opt_img.requires_grad = True
 
 # define layers, loss functions, weights and compute optimization targets
 style_layers = ['r11', 'r21', 'r31', 'r41', 'r51']
@@ -106,6 +108,6 @@ while n_iter[0] <= max_iter:
     optimizer.step(closure)
 
 # display result
-out_img = postp(opt_img.data[0].cpu().squeeze())
+out_img = postp(opt_img.data[0].squeeze())
+out_img.save("styletransfer_output.jpg")
 
-img_to_jpeg(out_img, "styletransfer_output.jpg")

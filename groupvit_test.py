@@ -29,31 +29,6 @@ torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
 
-class LoadImage:
-    """A simple pipeline to load image."""
-
-    def __call__(self, results):
-        """Call function to load images into results.
-        Args:
-            results (dict): A result dict contains the file name
-                of the image to be read.
-        Returns:
-            dict: ``results`` will be returned containing loaded image.
-        """
-
-        if isinstance(results['img'], str):
-            results['filename'] = results['img']
-            results['ori_filename'] = results['img']
-        else:
-            results['filename'] = None
-            results['ori_filename'] = None
-        img = mmcv.imread(results['img'])
-        results['img'] = img
-        results['img_shape'] = img.shape
-        results['ori_shape'] = img.shape
-        return results
-
-
 def inference(cfg, model, test_pipeline, text_transform, vis_modes, dataset, additional_classes, input_img, output_dir):
     if dataset == 'voc' or dataset == 'Pascal VOC':
         dataset_class = PascalVOCDataset

@@ -214,9 +214,9 @@ def main(local_rank):
     text_transform = build_text_transform(False, cfg.data.text_aug, with_dc=False)
     test_pipeline = build_seg_demo_pipeline()
 
-    part_to_style = {"face": "vangogh_starry_night.jpg", "background": "patterned_leaves.jpg"}
+    part_to_style = {"background": "styles/vangogh_starry_night.jpg", "goat": "styles/patterned_leaves.jpg"}
 
-    inference(cfg, model, test_pipeline, text_transform, 'voc', './test_dataset/12.jpg', "group_styletransfer_output.jpg", part_to_style, "vgg_conv.pth",
+    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/28.jpg', "group_styletransfer_output.jpg", part_to_style, "vgg_conv.pth",
               device)
 
 

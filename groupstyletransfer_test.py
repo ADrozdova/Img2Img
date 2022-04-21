@@ -41,7 +41,7 @@ def get_model(cfg, model, text_transform, dataset, additional_classes):
         seg_cfg = 'src/segmentation/configs/_base_/datasets/pascal_voc12.py'
     elif dataset == 'coco' or dataset == 'COCO':
         dataset_class = COCOObjectDataset
-        seg_cfg = 'src/segmentation/configs/_base_/datasets/coco_object164k.py'
+        seg_cfg = 'src/segmentation/configs/_base_/datasets/coco.py'
     elif dataset == 'context' or dataset == 'Pascal Context':
         dataset_class = PascalContextDataset
         seg_cfg = 'src/segmentation/configs/_base_/datasets/pascal_context.py'
@@ -160,7 +160,8 @@ def run_styleransfer(vgg, style_image, content_image, device, img_size):
     return np.asarray(out_img)
 
 
-def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, vgg_path, device):
+def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, vgg_path,
+              device):
     seg_model = get_model(cfg, model, text_transform, dataset, list(part_to_style.keys()))
     seg = get_seg(seg_model, test_pipeline, input_img)
 
@@ -171,11 +172,20 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
         param.requires_grad = False
 
     vgg = vgg.to(device)
-    result = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
+    # result = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
+
+    # background (to include unlabeled pixels)
+    result = run_styleransfer(vgg, part_to_style['background'], input_img, device, (seg.shape[0], seg.shape[1]))
 
     for part, style_image in part_to_style.items():
+        if part == "background":
+            continue
 
         label = seg_model.CLASSES.index(part)
+
+        if len(result[seg == label, :]):  # class not found
+            continue
+
         stylized = run_styleransfer(vgg, style_image, input_img, device, (seg.shape[0], seg.shape[1]))
 
         result[seg == label, :] = stylized[seg == label, :]
@@ -187,7 +197,6 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
 def main(local_rank):
     checkpoint_url = 'https://github.com/xvjiarui/GroupViT/releases/download/v1.0.0/group_vit_gcc_yfcc_30e-74d335e6.pth'
     cfg_path = 'src/configs/group_vit_gcc_yfcc_30e.yml'
-    output_dir = 'demo/output'
     vis_modes = ['input_pred_label', 'final_group']
 
     PSEUDO_ARGS = namedtuple('PSEUDO_ARGS',
@@ -216,7 +225,8 @@ def main(local_rank):
 
     part_to_style = {"background": "styles/vangogh_starry_night.jpg", "goat": "styles/patterned_leaves.jpg"}
 
-    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/28.jpg', "group_styletransfer_output.jpg", part_to_style, "vgg_conv.pth",
+    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/28.jpg',
+              "group_styletransfer_output.jpg", part_to_style, "vgg_conv.pth",
               device)
 
 

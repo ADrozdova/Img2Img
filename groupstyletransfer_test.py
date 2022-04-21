@@ -183,7 +183,7 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
 
         label = seg_model.CLASSES.index(part)
 
-        if len(result[seg == label, :]):  # class not found
+        if len(result[seg == label, :]) == 0:  # class not found
             continue
 
         stylized = run_styleransfer(vgg, style_image, input_img, device, (seg.shape[0], seg.shape[1]))
@@ -223,9 +223,9 @@ def main(local_rank):
     text_transform = build_text_transform(False, cfg.data.text_aug, with_dc=False)
     test_pipeline = build_seg_demo_pipeline()
 
-    part_to_style = {"background": "styles/vangogh_starry_night.jpg", "goat": "styles/patterned_leaves.jpg"}
+    part_to_style = {"background": "styles/vangogh_starry_night.jpg", "face": "styles/frida_kahlo.jpg"}
 
-    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/28.jpg',
+    inference(cfg, model, test_pipeline, text_transform, 'voc', './test_dataset/25.jpg',
               "group_styletransfer_output.jpg", part_to_style, "vgg_conv.pth",
               device)
 

@@ -87,9 +87,8 @@ def get_seg(seg_model, test_pipeline, input_img):
     return result[0]
 
 
-def run_styleransfer(vgg, style_image, content_image, device):
+def run_styleransfer(vgg, style_image, content_image, device, img_size):
     # pre and post processing for images
-    img_size = 512
     prep = transforms.Compose([transforms.Resize(img_size),
                                transforms.ToTensor(),
                                transforms.Lambda(lambda x: x[torch.LongTensor([2, 1, 0])]),  # turn to BGR
@@ -161,7 +160,7 @@ def run_styleransfer(vgg, style_image, content_image, device):
     return np.asarray(out_img)
 
 
-def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, vgg_path, local_rank):
+def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, vgg_path, device):
     seg_model = get_model(cfg, model, text_transform, dataset, list(part_to_style.keys()))
     seg = get_seg(seg_model, test_pipeline, input_img)
 
@@ -171,16 +170,13 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
     for param in vgg.parameters():
         param.requires_grad = False
 
-    device = prepare_device(local_rank)
-    torch.distributed.init_process_group(backend="nccl")
     vgg = vgg.to(device)
-
     result = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
 
     for part, style_image in part_to_style.items():
 
         label = seg_model.CLASSES.index(part)
-        stylized = run_styleransfer(vgg, style_image, input_img, device)
+        stylized = run_styleransfer(vgg, style_image, input_img, device, (seg.shape[0], seg.shape[1]))
 
         result[seg == label, :] = stylized[seg == label, :]
 
@@ -221,7 +217,7 @@ def main(local_rank):
     part_to_style = {"face": "vangogh_starry_night.jpg", "background": "patterned_leaves.jpg"}
 
     inference(cfg, model, test_pipeline, text_transform, 'voc', './test_dataset/12.jpg', "group_styletransfer_output.jpg", part_to_style, "vgg_conv.pth",
-              local_rank)
+              device)
 
 
 if __name__ == "__main__":

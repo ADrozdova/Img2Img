@@ -6,6 +6,7 @@ from .multi_label_contrastive import MultiLabelContrastive
 from .transformer import TextTransformer
 from .builder import build_model
 from .styletransfer_vgg import VGG
+from StyleNet import UNet
 
 
 __all__ = [
@@ -15,5 +16,7 @@ __all__ = [
     "MultiLabelContrastive",
     "GroupViT",
     "TextTransformer",
-    "VGG"
+    "VGG",
+    "UNet"
+
 ]

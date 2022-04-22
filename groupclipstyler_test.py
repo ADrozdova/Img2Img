@@ -169,6 +169,9 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
     vgg = models.vgg19(pretrained=True).features
     vgg.to(device)
 
+    for parameter in vgg.parameters():
+        parameter.requires_grad_(False)
+
     # background (to include unlabeled pixels)
 
     result = run_styleransfer(vgg, "a Photo", input_img, part_to_style['background'], (seg.shape[0], seg.shape[1]), device)

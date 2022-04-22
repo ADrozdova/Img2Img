@@ -10,8 +10,12 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from PIL import Image
+from mmcv.image import tensor2imgs
+from mmcv.parallel import collate, scatter
 from torchvision import transforms
 from torchvision.io import write_jpeg
+
+from src.datasets.imagenet_template import full_imagenet_templates
 
 ROOT_PATH = Path(__file__).absolute().resolve().parent.parent.parent
 
@@ -179,3 +183,29 @@ def im_convert2(tensor):
     image = image.clip(0, 1)  # in the previous steps, we change PIL image(0, 255) into tensor(0.0, 1.0), so convert it
 
     return image
+
+
+def get_seg(seg_model, test_pipeline, input_img):
+    device = next(seg_model.parameters()).device
+    # prepare data
+    data = dict(img=input_img)
+    data = test_pipeline(data)
+    data = collate([data], samples_per_gpu=1)
+    if next(seg_model.parameters()).is_cuda:
+        # scatter to specified GPU
+        data = scatter(data, [device])[0]
+    else:
+        data['img_metas'] = [i.data[0] for i in data['img_metas']]
+    with torch.no_grad():
+        result = seg_model(return_loss=False, rescale=True, **data)
+
+    img_tensor = data['img'][0]
+    img_metas = data['img_metas'][0]
+    imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
+    assert len(imgs) == len(img_metas)
+
+    return result[0]
+
+
+def compose_text_with_templates(text: str, templates=full_imagenet_templates) -> list:
+    return [template.format(text) for template in templates]

@@ -2,7 +2,6 @@ import os
 import warnings
 from collections import namedtuple
 
-import mmcv
 import numpy as np
 import torch
 import torch.nn as nn
@@ -18,12 +17,10 @@ from src.datasets import build_text_transform
 from src.loss import GramMSELoss, GramMatrix
 from src.model import build_model
 from src.model.styletransfer_vgg import VGG
-from src.segmentation.datasets import (COCOObjectDataset, PascalContextDataset,
-                                       PascalVOCDataset)
-from src.segmentation.evaluation import (GROUP_PALETTE, build_seg_demo_pipeline,
-                                         build_seg_inference)
+from src.segmentation.evaluation import (build_seg_demo_pipeline)
 from src.utils import get_config, load_checkpoint
-from src.utils import prepare_device
+from src.utils import prepare_device, get_seg
+from src.utils.init_models import get_seg_model
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -33,58 +30,6 @@ torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
-
-
-def get_model(cfg, model, text_transform, dataset, additional_classes):
-    if dataset == 'voc' or dataset == 'Pascal VOC':
-        dataset_class = PascalVOCDataset
-        seg_cfg = 'src/segmentation/configs/_base_/datasets/pascal_voc12.py'
-    elif dataset == 'coco' or dataset == 'COCO':
-        dataset_class = COCOObjectDataset
-        seg_cfg = 'src/segmentation/configs/_base_/datasets/coco.py'
-    elif dataset == 'context' or dataset == 'Pascal Context':
-        dataset_class = PascalContextDataset
-        seg_cfg = 'src/segmentation/configs/_base_/datasets/pascal_context.py'
-    else:
-        raise ValueError('Unknown dataset: {}'.format(dataset))
-    with read_write(cfg):
-        cfg.evaluate.seg.cfg = seg_cfg
-
-    dataset_cfg = mmcv.Config()
-    dataset_cfg.CLASSES = list(dataset_class.CLASSES)
-    dataset_cfg.PALETTE = dataset_class.PALETTE.copy()
-
-    if len(additional_classes) > 0:
-        additional_classes = list(
-            set(additional_classes) - set(dataset_cfg.CLASSES))
-        dataset_cfg.CLASSES.extend(additional_classes)
-        dataset_cfg.PALETTE.extend(GROUP_PALETTE[np.random.choice(
-            list(range(len(GROUP_PALETTE))), len(additional_classes))])
-    seg_model = build_seg_inference(model, dataset_cfg, text_transform,
-                                    cfg.evaluate.seg)
-    return seg_model
-
-
-def get_seg(seg_model, test_pipeline, input_img):
-    device = next(seg_model.parameters()).device
-    # prepare data
-    data = dict(img=input_img)
-    data = test_pipeline(data)
-    data = collate([data], samples_per_gpu=1)
-    if next(seg_model.parameters()).is_cuda:
-        # scatter to specified GPU
-        data = scatter(data, [device])[0]
-    else:
-        data['img_metas'] = [i.data[0] for i in data['img_metas']]
-    with torch.no_grad():
-        result = seg_model(return_loss=False, rescale=True, **data)
-
-    img_tensor = data['img'][0]
-    img_metas = data['img_metas'][0]
-    imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
-    assert len(imgs) == len(img_metas)
-
-    return result[0]
 
 
 def run_styleransfer(vgg, style_image, content_image, device, img_size):
@@ -162,7 +107,7 @@ def run_styleransfer(vgg, style_image, content_image, device, img_size):
 
 def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, vgg_path,
               device):
-    seg_model = get_model(cfg, model, text_transform, dataset, list(part_to_style.keys()))
+    seg_model = get_seg_model(cfg, model, text_transform, dataset, list(part_to_style.keys()))
     seg = get_seg(seg_model, test_pipeline, input_img)
 
     # get network

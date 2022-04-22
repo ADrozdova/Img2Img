@@ -23,7 +23,7 @@ source = "a Photo"
 
 text = "Sketch with black pencil"  # @param {"type": "string"}
 
-image_dir = "/images/face.jpg"  # @param {type: "string"}
+image_dir = "images/face.jpg"  # @param {type: "string"}
 
 training_iterations = 100  # @param {type: "integer"}
 
@@ -173,7 +173,7 @@ for epoch in range(0, steps + 1):
         print('TV loss: ', reg_tv.item())
         output_image = target.clone()
 
-output_image = torch.clamp(output_image, 0, 1)
+output_image = torch.clamp(output_image, 0, 1).squeeze()
 output_image = adjust_contrast(output_image, 1.5)
 output_image = transforms.ToPILImage()(output_image.cpu())
 output_image.save("clipstyler_output.jpg")

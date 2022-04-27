@@ -7,8 +7,6 @@ import torch
 import torch.nn as nn
 from PIL import Image
 from mmcv.cnn.utils import revert_sync_batchnorm
-from mmcv.image import tensor2imgs
-from mmcv.parallel import collate, scatter
 from omegaconf import read_write
 from torch import optim
 from torchvision import transforms

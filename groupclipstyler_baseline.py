@@ -13,7 +13,7 @@ from torch import optim
 from torchvision import models
 from torchvision import transforms
 from torchvision.transforms.functional import adjust_contrast
-from src.loss import GramMSELoss, GramMatrix
+
 from src.datasets import build_text_transform
 from src.datasets.imagenet_template import full_imagenet_templates
 from src.model import UNet
@@ -34,15 +34,23 @@ torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
 
-def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, device, training_iterations=100):
+def run_styleransfer(vgg, source, image_dir, text, img_size, device, training_iterations=100):
     img_height, img_width = img_size
-    source = " ".join(content)
+    if img_height % 64 != 0 or img_width % 64 != 0:
+        if img_height < 700:
+            img_height = 512
+            img_width = 512
+        elif img_height < 1500:
+            img_height = 1024
+            img_width = 1024
+        else:
+            img_height = 2048
+            img_width = 2048
 
     training_args = {
         "lambda_tv": 2e-3,
         "lambda_patch": 9000,
         "lambda_dir": 500,
-        "lambda_gram": -500,
         "content_weight": 150,
         "crop_size": 128,
         "num_crops": 64,
@@ -141,14 +149,7 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
 
         reg_tv = args.lambda_tv * get_image_prior_losses(target)
 
-        loss_gram = 0
-
-        for i in range(len(content)):
-            for j in range(i):
-                loss_gram += GramMSELoss()(content_image[seg == seg_model.CLASSES.index(content[i]), :],
-                                           GramMatrix()(target[seg == seg_model.CLASSES.index(content[j]), :]))
-
-        total_loss = args.lambda_patch * loss_patch + args.content_weight * content_loss + reg_tv + args.lambda_dir * loss_glob + args.lambda_gram * loss_gram
+        total_loss = args.lambda_patch * loss_patch + args.content_weight * content_loss + reg_tv + args.lambda_dir * loss_glob
         total_loss_epoch.append(total_loss)
 
         optimizer.zero_grad()
@@ -171,8 +172,8 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
     return np.asarray(output_image)
 
 
-def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, text_style, device):
-    seg_model = get_seg_model(cfg, model, text_transform, dataset, list(text_style.split()))
+def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, device):
+    seg_model = get_seg_model(cfg, model, text_transform, dataset, list(part_to_style.keys()))
     seg = get_seg(seg_model, test_pipeline, input_img)
 
     # get network
@@ -182,16 +183,25 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
     for parameter in vgg.parameters():
         parameter.requires_grad_(False)
 
-    content = []
+    # background (to include unlabeled pixels)
 
-    for word in text_style.split():
-        if len(seg[seg == seg_model.CLASSES.index(word), :]) > 0:
-            content.append(word)
+    result = run_styleransfer(vgg, "a Photo", input_img, part_to_style['background'], (seg.shape[0], seg.shape[1]), device)
 
-    stylized = run_styleransfer(vgg, " ".join(content), input_img, text_style, seg, seg_model, (seg.shape[0], seg.shape[1]),
-                                device)
+    for part, style in part_to_style.items():
+        if part == "background":
+            continue
 
-    img_result = Image.fromarray(np.uint8(stylized))
+        label = seg_model.CLASSES.index(part)
+
+        if len(result[seg == label, :]) == 0:  # class not found
+            continue
+
+        stylized = run_styleransfer(vgg, "a Photo", input_img, style, (seg.shape[0], seg.shape[1]),
+                                  device)
+
+        result[seg == label, :] = stylized[seg == label, :]
+
+    img_result = Image.fromarray(np.uint8(result))
     img_result.save(output_file)
 
 
@@ -224,9 +234,9 @@ def main(local_rank):
     text_transform = build_text_transform(False, cfg.data.text_aug, with_dc=False)
     test_pipeline = build_seg_demo_pipeline()
 
-    style_text = "person to starry night by van gogh, background to purple watercolour painting"
+    part_to_style = {"background": "watercolour painting", "person": "japanese painting", "hat": "neon light"}
 
-    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/12_512.jpg', "group_clipstyler_output_12_512.jpg", style_text, device)
+    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/12.jpg', "group_clipstyler_output.jpg", part_to_style, device)
 
 
 if __name__ == "__main__":

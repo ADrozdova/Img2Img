@@ -36,6 +36,16 @@ np.random.seed(SEED)
 
 def run_styleransfer(vgg, source, image_dir, text, img_size, device, training_iterations=100):
     img_height, img_width = img_size
+    if img_height % 64 != 0 or img_width % 64 != 0:
+        if img_height < 700:
+            img_height = 512
+            img_width = 512 
+        elif img_height < 1500:
+            img_height = 1024
+            img_width = 1024
+        else:
+            img_height = 2048
+            img_width = 2048
 
     training_args = {
         "lambda_tv": 2e-3,
@@ -158,7 +168,8 @@ def run_styleransfer(vgg, source, image_dir, text, img_size, device, training_it
     output_image = torch.clamp(output_image, 0, 1).squeeze()
     output_image = adjust_contrast(output_image, 1.5)
     output_image = transforms.ToPILImage()(output_image.cpu())
-    return output_image
+    output_image = output_image.resize(img_size)
+    return np.asarray(output_image)
 
 
 def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, device):
@@ -223,9 +234,9 @@ def main(local_rank):
     text_transform = build_text_transform(False, cfg.data.text_aug, with_dc=False)
     test_pipeline = build_seg_demo_pipeline()
 
-    part_to_style = {"background": "vangogh starry night", "face": "black pencil sketch"}
+    part_to_style = {"background": "watercolour painting", "person": "japanese painting", "hat": "neon light"}
 
-    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/25.jpg', "group_clipstyler_output.jpg", part_to_style, device)
+    inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/12.jpg', "group_clipstyler_output.jpg", part_to_style, device)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ np.random.seed(SEED)
 def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, device, training_iterations=100):
     img_height, img_width = img_size
     source = " ".join(content)
-
+    
     training_args = {
         "lambda_tv": 2e-3,
         "lambda_patch": 9000,
@@ -142,11 +142,14 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
         reg_tv = args.lambda_tv * get_image_prior_losses(target)
 
         loss_gram = 0
+        
 
         for i in range(len(content)):
             for j in range(i):
-                loss_gram += GramMSELoss()(content_image[seg == seg_model.CLASSES.index(content[i]), :],
-                                           GramMatrix()(target[seg == seg_model.CLASSES.index(content[j]), :]))
+                img_seg = torch.unsqueeze(content_image[0, :,  seg == seg_model.CLASSES.index(content[i])], 0)
+                target_seg = torch.unsqueeze(target[0, :, seg == seg_model.CLASSES.index(content[j])], 0)
+                loss_gram += GramMSELoss()(torch.unsqueeze(img_seg, 0),
+                        GramMatrix()(torch.unsqueeze(target_seg, 0)))
 
         total_loss = args.lambda_patch * loss_patch + args.content_weight * content_loss + reg_tv + args.lambda_dir * loss_glob + args.lambda_gram * loss_gram
         total_loss_epoch.append(total_loss)
@@ -185,10 +188,10 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
     content = []
 
     for word in text_style.split():
-        if len(seg[seg == seg_model.CLASSES.index(word), :]) > 0:
+        if len(seg[seg == seg_model.CLASSES.index(word)]) > 0:
             content.append(word)
 
-    stylized = run_styleransfer(vgg, " ".join(content), input_img, text_style, seg, seg_model, (seg.shape[0], seg.shape[1]),
+    stylized = run_styleransfer(vgg, content, input_img, text_style, seg, seg_model, (seg.shape[0], seg.shape[1]),
                                 device)
 
     img_result = Image.fromarray(np.uint8(stylized))
@@ -224,7 +227,7 @@ def main(local_rank):
     text_transform = build_text_transform(False, cfg.data.text_aug, with_dc=False)
     test_pipeline = build_seg_demo_pipeline()
 
-    style_text = "person to starry night by van gogh, background to purple watercolour painting"
+    style_text = "person to starry night by van gogh, background to purple watercolour painting, hat to neon light"
 
     inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/12_512.jpg', "group_clipstyler_output_12_512.jpg", style_text, device)
 

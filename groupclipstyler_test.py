@@ -24,6 +24,7 @@ from src.utils import prepare_device, get_seg, compose_text_with_templates, load
     get_image_prior_losses, clip_normalize
 from src.utils.init_models import get_seg_model
 
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # fix random seeds for reproducibility
@@ -38,14 +39,17 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
     img_height, img_width = img_size
     source = " ".join(content)
     
+
     training_args = {
         "lambda_tv": 2e-3,
         "lambda_patch": 9000,
         "lambda_dir": 500,
-        "lambda_gram": -500,
+        "lambda_gram": 10,
         "content_weight": 150,
         "crop_size": 128,
         "num_crops": 64,
+        "patch_size": 16,
+        "patch_step": 16,
         "img_height": img_height,
         "img_width": img_width,
         "max_step": training_iterations,
@@ -77,6 +81,8 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
         transforms.RandomPerspective(fill=0, p=1, distortion_scale=0.5),
         transforms.Resize(224)
     ])
+
+    patches_seg = seg.unfold(0, args.patch_size, args.patch_step).unfold(1, args.patch_size, args.patch_step)
 
     clip_model, preprocess = clip.load('ViT-B/32', device, jit=False)
 
@@ -142,14 +148,32 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
         reg_tv = args.lambda_tv * get_image_prior_losses(target)
 
         loss_gram = 0
-        
 
-        for i in range(len(content)):
-            for j in range(i):
-                img_seg = torch.unsqueeze(content_image[0, :,  seg == seg_model.CLASSES.index(content[i])], 0)
-                target_seg = torch.unsqueeze(target[0, :, seg == seg_model.CLASSES.index(content[j])], 0)
-                loss_gram += GramMSELoss()(torch.unsqueeze(img_seg, 0),
-                        GramMatrix()(torch.unsqueeze(target_seg, 0)))
+        target_patches = target.unfold(2, args.patch_size, args.patch_step).unfold(3, args.patch_size, args.patch_step)
+
+ 
+        for one_i in range(patches_seg.shape[0]):
+            for one_j in range(patches_seg.shape[0]):
+                for two_i in range(one_i + 1):
+                    for two_j in range(patches_seg.shape[0]):
+                        seg_class_1 = torch.unique(patches_seg[one_i, one_j])
+                        seg_class_2 = torch.unique(patches_seg[two_i, two_j])
+                        if (one_i, one_j) != (two_i, two_j) and len(seg_class_1) == 1 and len(seg_class_1) == 1:
+                            
+                            loss_gram_patch = GramMSELoss()(target_patches[:, :, one_i, one_j, :],
+                                    GramMatrix()(target_patches[:, :, two_i, two_j, :]))
+                            if seg_class_1[0] == seg_class_2[0]:
+                                loss_gram += loss_gram_patch
+                            else:
+                                loss_gram -= loss_gram_patch
+                            
+
+        #for i in range(len(content)):
+        #    for j in range(i):
+        #        seg_i = torch.unsqueeze(target[0, :,  seg == seg_model.CLASSES.index(content[i])], 0)
+        #        seg_j = torch.unsqueeze(target[0, :, seg == seg_model.CLASSES.index(content[j])], 0)
+        #        loss_gram += GramMSELoss()(torch.unsqueeze(seg_i, 0),
+        #                GramMatrix()(torch.unsqueeze(seg_j, 0)))
 
         total_loss = args.lambda_patch * loss_patch + args.content_weight * content_loss + reg_tv + args.lambda_dir * loss_glob + args.lambda_gram * loss_gram
         total_loss_epoch.append(total_loss)
@@ -165,6 +189,7 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
             print('patch loss: ', loss_patch.item())
             print('dir loss: ', loss_glob.item())
             print('TV loss: ', reg_tv.item())
+            print('Gram MSE loss', loss_gram.item())
             output_image = target.clone()
 
     output_image = torch.clamp(output_image, 0, 1).squeeze()
@@ -177,7 +202,6 @@ def run_styleransfer(vgg, content, image_dir, text, seg, seg_model, img_size, de
 def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, text_style, device):
     seg_model = get_seg_model(cfg, model, text_transform, dataset, list(text_style.split()))
     seg = get_seg(seg_model, test_pipeline, input_img)
-
     # get network
     vgg = models.vgg19(pretrained=True).features
     vgg.to(device)
@@ -191,7 +215,7 @@ def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, out
         if len(seg[seg == seg_model.CLASSES.index(word)]) > 0:
             content.append(word)
 
-    stylized = run_styleransfer(vgg, content, input_img, text_style, seg, seg_model, (seg.shape[0], seg.shape[1]),
+    stylized = run_styleransfer(vgg, content, input_img, text_style, torch.from_numpy(seg), seg_model, (seg.shape[0], seg.shape[1]),
                                 device)
 
     img_result = Image.fromarray(np.uint8(stylized))
@@ -227,7 +251,7 @@ def main(local_rank):
     text_transform = build_text_transform(False, cfg.data.text_aug, with_dc=False)
     test_pipeline = build_seg_demo_pipeline()
 
-    style_text = "person to starry night by van gogh, background to purple watercolour painting, hat to neon light"
+    style_text = "person to sketch with black pencil background to watercolour"
 
     inference(cfg, model, test_pipeline, text_transform, 'context', './test_dataset/12_512.jpg', "group_clipstyler_output_12_512.jpg", style_text, device)
 

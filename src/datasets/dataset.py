@@ -4,13 +4,12 @@ import torch
 import torchvision.transforms.functional as F
 from PIL import Image
 
-from src.utils.util import load_dataset
-
 
 class ImageFolderDataset(torch.utils.data.Dataset):
     def __init__(self, img_folder, part, url=None, transform=None):
         self.img_folder = img_folder
         if not os.path.exists(self.img_folder):
+            from src.utils.util import load_dataset
             load_dataset(url, self.img_folder + ".zip")
         self.transform = transform
         self.part = part
@@ -31,6 +30,7 @@ class TestDataset(torch.utils.data.Dataset):
     def __init__(self, img_folder, url=None, transform=None):
         self.img_folder = img_folder
         if not os.path.exists(self.img_folder):
+            from src.utils.util import load_dataset
             load_dataset(url, self.img_folder + ".zip")
         self.transform = transform
         self.all_imgs = os.listdir(img_folder)

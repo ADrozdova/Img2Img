@@ -209,3 +209,41 @@ def get_seg(seg_model, test_pipeline, input_img):
 
 def compose_text_with_templates(text: str, templates=full_imagenet_templates) -> list:
     return [template.format(text) for template in templates]
+
+
+def get_patches_idx(seg, patch_size, patch_step):
+    patches_seg = seg.unfold(
+        0, patch_size, patch_step
+    ).unfold(1, patch_size, patch_step)
+    patches_coords = []
+    patches_classes = []
+    for i in range(patches_seg.shape[0]):
+        for j in range(patches_seg.shape[1]):
+            seg_class = torch.unique(patches_seg[i, j])
+            if len(seg_class) == 1:
+                patches_coords.append((i, j))
+                patches_classes.append(seg_class[0].item())
+
+    return patches_coords, patches_classes
+
+
+def get_text_feats(clip, clip_model, text, device):
+    with torch.no_grad():
+        template_text = compose_text_with_templates(text, full_imagenet_templates)
+        tokens = clip.tokenize(template_text).to(device)
+        text_features = clip_model.encode_text(tokens).detach()
+        text_features = text_features.mean(axis=0, keepdim=True)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+    return text_features
+
+
+def get_source_features(clip, clip_model, source, device, content_image):
+    with torch.no_grad():
+        template_source = compose_text_with_templates(source, full_imagenet_templates)
+        tokens_source = clip.tokenize(template_source).to(device)
+        text_source = clip_model.encode_text(tokens_source).detach()
+        text_source = text_source.mean(axis=0, keepdim=True)
+        text_source /= text_source.norm(dim=-1, keepdim=True)
+        source_features = clip_model.encode_image(clip_normalize(content_image, device))
+        source_features /= source_features.clone().norm(dim=-1, keepdim=True)
+    return text_source, source_features

@@ -1,0 +1,37 @@
+{
+  "name": "group clipstyler config",
+  "data": {
+    "input": "test_dataset_resized",
+    "image_path": ["46.jpg", "18.jpg", "28.jpg", "41.png", "45.jpg"],
+    "output": "outputs_group_clipstyler/"
+  },
+  "clipstyler": {
+    "args": {
+      "lambda_tv": 2e-3,
+      "lambda_patch": 9000,
+      "lambda_dir": 500,
+      "content_weight": 150,
+      "crop_size": 128,
+      "num_crops": 64,
+      "max_step": 100,
+      "lr": 5e-4,
+      "thresh": 0.7,
+      "texts": ["stick as fire sea as watercolour painting",
+        "person as pop art, background as oil painting of white roses",
+        "goat as dark orange leaf pattern, background as starry night by van gogh",
+        "rock as pop art, sky as watercolour painting",
+        "dog as sketch with black pencil, plant as japanese painting, background as watercolour painting"]
+    },
+    "gram_args": {
+      "patch_size_step": [[64, 64], [32, 32]],
+      "lambda_gram": [0, 1e-3, 1e-2, 1e-1, 1.0, 4.0, 10.0],
+      "patch_rate": [0.2, 0.5, 0.7, 1.0]
+    }
+  },
+  "groupvit": {
+    "checkpoint_url": "https://github.com/xvjiarui/GroupViT/releases/download/v1.0.0/group_vit_gcc_yfcc_30e-74d335e6.pth",
+    "cfg_path": "src/configs/group_vit_gcc_yfcc_30e.yml",
+    "vis_modes": ["input_pred_label", "final_group"],
+    "dataset": "context"
+  }
+}

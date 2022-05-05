@@ -7,7 +7,7 @@ from mmcv.cnn.utils import revert_sync_batchnorm
 from omegaconf import read_write
 
 import src.model as module_arch
-from src.model import build_model
+
 from src.segmentation.datasets import (COCOObjectDataset, PascalContextDataset,
                                        PascalVOCDataset)
 from src.segmentation.evaluation import (GROUP_PALETTE, build_seg_inference)
@@ -104,6 +104,7 @@ def get_model_from_cfg(config, device):
     with read_write(cfg):
         cfg.evaluate.eval_only = True
 
+    from src.model import build_model
     model = build_model(cfg.model)
     model = revert_sync_batchnorm(model)
     model.to(device)

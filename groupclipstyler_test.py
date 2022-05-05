@@ -209,11 +209,11 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
         texts_all = [texts_all]
 
     all_words = []
-    if isinstance(texts_all, dict):
-        for text in texts_all.keys():
-            all_words.extend(text.split())
-    else:
-        for text in texts_all:
+
+    for text in texts_all:
+        if isinstance(text, collections.OrderedDict):
+            all_words.extend(list(text.keys()))
+        else:
             all_words.extend(text.split())
 
     seg_model = get_seg_model(
@@ -231,12 +231,13 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
         seg = get_seg(seg_model, test_pipeline, input_img)
 
         content = []
-        for word in text_style.split():
-            if len(seg[seg == seg_model.CLASSES.index(word)]) > 0:
-                content.append(word)
+        if config["clipstyler"]["args"]["get_content"]:
+            for word in text_style.split():
+                if len(seg[seg == seg_model.CLASSES.index(word)]) > 0:
+                    content.append(word)
 
         gram_args_all = config["clipstyler"]["gram_args"]
-        for trial in config["data"]["n_trials"]:
+        for trial in range(config["data"]["n_trials"]):
             for patch_size, patch_step in gram_args_all["patch_size_step"]:
                 for lambda_gram in gram_args_all["lambda_gram"]:
                     for patch_rate in gram_args_all["patch_rate"]:
@@ -250,10 +251,13 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
                         print("\nImage:", img_name, "parameters:", gram_args, "\n")
 
                         if config["data"]["use_masks"]:
-                            result = run_styleransfer(vgg, content, input_img, text_style['background'],
-                                                      config["clipstyler"]["args"],
+                            # just so there are no black spots
+                            background = "background" if 'background' in text_style else list(text_style.keys())[0]
+                            result = run_styleransfer(vgg, content, input_img, text_style[background],
+                                                      config["clipstyler"]["args"], gram_args,
                                                       torch.from_numpy(seg), seg_model,
                                                       (seg.shape[0], seg.shape[1]), device)
+
                             for part, style in text_style.items():
                                 if part == "background":
                                     continue
@@ -263,8 +267,10 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
                                 if len(result[seg == label, :]) == 0:  # class not found
                                     continue
 
-                                stylized = run_styleransfer(vgg, "a Photo", input_img, style,
-                                                            (seg.shape[0], seg.shape[1]), device)
+                                stylized = run_styleransfer(vgg, content, input_img, style,
+                                                          config["clipstyler"]["args"], gram_args,
+                                                          torch.from_numpy(seg), seg_model,
+                                                          (seg.shape[0], seg.shape[1]), device)
 
                                 result[seg == label, :] = stylized[seg == label, :]
 
@@ -272,11 +278,11 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
                                 out_path = os.path.join(config["data"]["output"],
                                                         img_name.split(".")[0] + "_" + str(trial) + ".jpg")
                             else:
-                                out_path = os.path.join(config["data"]["output"], img_name.split(".")[0],
-                                                        str(trial) + ".jpg")
-
+                                out_path = os.path.join(config["data"]["output"], img_name.split(".")[0])
+                                if not os.path.exists(out_path):
+                                    os.mkdir(out_path)
                             img_result = Image.fromarray(np.uint8(result))
-                            img_result.save(out_path)
+                            img_result.save(os.path.join(out_path, str(trial) + ".jpg"))
                         else:
                             stylized = run_styleransfer(vgg, content, input_img, text_style, config["clipstyler"]["args"],
                                                         gram_args, torch.from_numpy(seg), seg_model,
@@ -285,13 +291,15 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
                                 out_path = os.path.join(
                                     config["data"]["output"],
                                     img_name.split(".")[0] + "_psz_" + str(patch_size) + "_pst_" + str(patch_step) + "_lg_"
-                                    + str(lambda_gram) + "_pr_" + str(patch_rate) + "_" + str(trial) + ".jpg", )
+                                    + str(lambda_gram) + "_pr_" + str(patch_rate) + "_" + str(trial) + ".jpg")
                             else:
                                 out_path = os.path.join(
                                     config["data"]["output"],
                                     img_name.split(".")[0] + "_psz_" + str(patch_size) + "_pst_" + str(patch_step) + "_lg_"
-                                    + str(lambda_gram) + "_pr_" + str(patch_rate), str(trial) + ".jpg")
-                            Image.fromarray(np.uint8(stylized)).save(out_path)
+                                    + str(lambda_gram) + "_pr_" + str(patch_rate))
+                                if not os.path.exists(out_path):
+                                    os.mkdir(out_path)
+                            Image.fromarray(np.uint8(stylized)).save(os.path.join(out_path, str(trial) + ".jpg"))
 
 
 def main(config):

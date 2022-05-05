@@ -63,7 +63,7 @@ def load_checkpoint(config, model, optimizer, lr_scheduler):
         metrics = checkpoint['metrics']
 
     del checkpoint
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     return metrics
 
 

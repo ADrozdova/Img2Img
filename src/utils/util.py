@@ -14,6 +14,7 @@ from mmcv.image import tensor2imgs
 from mmcv.parallel import collate, scatter
 from torchvision import transforms
 from torchvision.io import write_jpeg
+import spacy
 
 from src.datasets.imagenet_template import full_imagenet_templates
 
@@ -237,13 +238,51 @@ def get_text_feats(clip, clip_model, text, device):
     return text_features
 
 
-def get_source_features(clip, clip_model, source, device, content_image):
+def get_text_source(clip, clip_model, source, device):
     with torch.no_grad():
         template_source = compose_text_with_templates(source, full_imagenet_templates)
         tokens_source = clip.tokenize(template_source).to(device)
         text_source = clip_model.encode_text(tokens_source).detach()
         text_source = text_source.mean(axis=0, keepdim=True)
         text_source /= text_source.norm(dim=-1, keepdim=True)
+    return text_source
+
+
+def get_source_features(clip_model, device, content_image):
+    with torch.no_grad():
         source_features = clip_model.encode_image(clip_normalize(content_image, device))
         source_features /= source_features.clone().norm(dim=-1, keepdim=True)
-    return text_source, source_features
+    return source_features
+
+
+def dependency_parse(words, sentence):
+    nlp = spacy.load("en_core_web_sm")
+    doc = nlp(sentence)
+    token_texts = [tok.text for tok in doc]
+
+    result = dict()
+
+    for word in words:
+        idx = token_texts.index(word)
+        nodes = [doc[idx]]
+        word_children_idx = []
+        while len(nodes) > 0:
+            node = nodes.pop()
+            for child in node.children:
+                if child.text not in words:
+                    nodes.append(child)
+            if node.text not in words:
+                word_children_idx.append(node.i)
+
+        result[word] = [token_texts[idx] for idx in sorted(word_children_idx)]
+        result[word] = " ".join(result[word])
+    return result
+
+
+def img_dir(img_aug, source_features, clip_model, device):
+    image_features = clip_model.encode_image(clip_normalize(img_aug, device))
+    image_features /= image_features.clone().norm(dim=-1, keepdim=True)
+
+    img_direction = image_features - source_features
+    img_direction /= img_direction.clone().norm(dim=-1, keepdim=True)
+    return img_direction

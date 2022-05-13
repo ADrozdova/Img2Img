@@ -54,30 +54,33 @@ def run_styleransfer(
     text,
     text_parsed,
     classes,
-    training_args,
-    patch_args,
+    args,
     seg,
     img_size,
     device,
 ):
     img_height, img_width = img_size
-    source = " ".join(content) if training_args["get_content"] else "a Picture"
+    source = " ".join(content) if args["get_content"] else "a Picture"
 
     content_image = load_image2(image_path, img_height=img_height, img_width=img_width)
     content_image = content_image.to(device)
+
+    if "padding" in args and args["padding"] > 0:
+        content_image = transforms.Pad(padding = args["padding"])(content_image)
+        seg = transforms.Pad(padding=args["padding"])(seg)
 
     content_features = get_features(img_normalize(content_image, device), vgg)
 
     style_net = UNet()
     style_net.to(device)
 
-    optimizer = optim.Adam(style_net.parameters(), lr=training_args["lr"])
+    optimizer = optim.Adam(style_net.parameters(), lr=args["lr"])
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
 
     total_loss_epoch = []
     output_image = content_image
 
-    cropper = transforms.Compose([transforms.RandomCrop(training_args["crop_size"])])
+    cropper = transforms.Compose([transforms.RandomCrop(args["crop_size"])])
     augment = transforms.Compose(
         [
             transforms.RandomPerspective(fill=0, p=1, distortion_scale=0.5),
@@ -87,15 +90,16 @@ def run_styleransfer(
 
     clip_model, preprocess = clip.load("ViT-B/32", device, jit=False)
 
-    if patch_args["lambda_gram"] != 0 or patch_args["lambda_clip_patch"] != 0:
-        patches_coords, patches_classes = get_patches_idx(seg, patch_args["patch_size"], patch_args["patch_step"])
+
+
+    if args["lambda_gram"] != 0 or args["lambda_clip_patch"] != 0:
+        patches_coords, patches_classes = get_patches_idx(seg, args["patch_size"], args["patch_step"])
 
         content_img_patches = content_image.unfold(
-            2, patch_args["patch_size"], patch_args["patch_step"]
-        ).unfold(3, patch_args["patch_size"], patch_args["patch_step"])
+            2, args["patch_size"], args["patch_step"]
+        ).unfold(3, args["patch_size"], args["patch_step"])
 
         patches_content = [content_img_patches[:, :, coords[0], coords[1], :] for coords in patches_coords]
-        patches_features = get_source_features(clip_model, device, torch.cat(patches_content, dim=0))
 
     text_features = get_text_feats(clip, clip_model, text, device)
     text_source = get_text_source(clip, clip_model, source, device)
@@ -103,15 +107,17 @@ def run_styleransfer(
 
     parts_text_dirs = dict()
     for part, text_part in text_parsed.items():
-        text_features_part = get_text_feats(clip, clip_model, text, device)
+        text_features_part = get_text_feats(clip, clip_model, text_part, device)
 
         text_source_part = get_text_source(clip, clip_model, part, device)
 
-        parts_text_dirs[classes.index(part)] = text_features_part - text_source_part
+        # print(classes.index(part), text_part)
+        dir_part = text_features_part - text_source_part
 
+        dir_part = dir_part / dir_part.norm(dim=-1, keepdim=True)
+        parts_text_dirs[classes.index(part)] = dir_part
 
-    num_crops = training_args["num_crops"]
-    for epoch in range(0, training_args["max_step"] + 1):
+    for epoch in range(0, args["max_step"] + 1):
         scheduler.step()
         target = style_net(content_image, use_sigmoid=True).to(device)
         target.requires_grad_(True)
@@ -121,17 +127,13 @@ def run_styleransfer(
         content_loss = torch.mean((target_features["conv4_2"] - content_features["conv4_2"]) ** 2)
         content_loss += torch.mean((target_features["conv5_2"] - content_features["conv5_2"]) ** 2)
 
-        img_proc = []
-        for _ in range(num_crops):
-            img_proc.append(augment(cropper(target)))
-
-        img_aug = torch.cat(img_proc, dim=0)
+        img_aug = torch.cat([augment(cropper(target)) for _ in range(args["num_crops"])], dim=0)
 
         img_direction = img_dir(img_aug, source_features, clip_model, device)
         text_direction = (text_features - text_source).repeat(img_aug.size(0), 1)
         text_direction /= text_direction.norm(dim=-1, keepdim=True)
         loss_temp = 1 - torch.cosine_similarity(img_direction, text_direction, dim=1)
-        loss_temp[loss_temp < training_args["thresh"]] = 0
+        loss_temp[loss_temp < args["thresh"]] = 0
 
         loss_patch = loss_temp.mean()
 
@@ -143,18 +145,18 @@ def run_styleransfer(
 
         loss_glob = (1 - torch.cosine_similarity(glob_direction, text_direction, dim=1)).mean()
 
-        reg_tv = training_args["lambda_tv"] * get_image_prior_losses(target)
+        reg_tv = args["lambda_tv"] * get_image_prior_losses(target)
 
         loss_gram = 0
         loss_clip_patches = 0
 
-        if patch_args["lambda_gram"] != 0  or patch_args["lambda_clip_patch"] != 0:
+        if args["lambda_gram"] != 0  or args["lambda_clip_patch"] != 0:
             target_patches = target.unfold(
-                2, patch_args["patch_size"], patch_args["patch_step"]
-            ).unfold(3, patch_args["patch_size"], patch_args["patch_step"])
+                2, args["patch_size"], args["patch_step"]
+            ).unfold(3, args["patch_size"], args["patch_step"])
             indices = np.random.choice(
                 range(len(patches_coords)),
-                int(len(patches_coords) * patch_args["patch_rate"]),
+                int(len(patches_coords) * args["patch_rate"]),
                 replace=False,
             )
 
@@ -163,46 +165,46 @@ def run_styleransfer(
                 patches_selected.append(target_patches[:, :, patches_coords[indices[i]][0], patches_coords[indices[i]][1], :])
 
             patches_selected = torch.cat(patches_selected, dim=0)
-            patches_gram = GramMatrix()(patches_selected)
+
+            patches_selected_clone = patches_selected.data.clone()
+            patches_selected_clone.requires_grad = True
+
+            patches_features = get_features(img_normalize(patches_selected, device), vgg,
+                                            layers={'0': 'conv1_1', '5': 'conv2_1', '10': 'conv3_1', '19': 'conv4_1',
+                                                    '28': 'conv5_1'})
+            patches_gram = [GramMatrix()(A) for A in patches_features.values()]
 
             text_dirs_patches = []
-            source_features_patches = []
 
             for i in range(len(indices)):
                 a = indices[i]
-                text_dirs_patches.append(parts_text_dirs[patches_classes[a]])
-                source_features_patches.append(patches_features[a:a+1])
+                cl = patches_classes[a] if patches_classes[a] in parts_text_dirs else list(parts_text_dirs.keys())[0]
+                text_dirs_patches.append(parts_text_dirs[cl])
 
-                if patch_args["lambda_gram"] != 0:
+                if args["lambda_gram"] != 0:
                     for j in range(i):
-                        loss_gram_patch = nn.MSELoss()(patches_gram[i], patches_gram[j])
+                        loss_gram_patch = sum([nn.MSELoss()(patches_gram[l][i], patches_gram[l][j]) for l in range(len(patches_gram))])
                         if patches_classes[a] == patches_classes[indices[j]]:
                             loss_gram += loss_gram_patch
                         else:
                             loss_gram -= loss_gram_patch
-            if patch_args["lambda_clip_patch"] != 0:
-                image_features_patches = clip_model.encode_image(clip_normalize(augment(patches_selected), device))
-                image_features_patches /= image_features_patches.clone().norm(dim=-1, keepdim=True)
-
-                source_features_patches = torch.cat(source_features_patches, dim=0)
-
-                img_direction_patches = image_features_patches - source_features_patches
-                img_direction_patches /= img_direction_patches.clone().norm(dim=-1, keepdim=True)
+            if args["lambda_clip_patch"] != 0:
+                img_direction_patches = img_dir(augment(patches_selected), source_features, clip_model, device)
 
                 text_dirs_patches = torch.cat(text_dirs_patches, dim=0)
                 text_dirs_patches /= text_dirs_patches.norm(dim=-1, keepdim=True)
 
                 loss_clip_patches = 1 - torch.cosine_similarity(img_direction_patches, text_dirs_patches, dim=1)
-                # loss_clip_patches[loss_clip_patches < training_args["thresh"]] = 0
+                loss_clip_patches[loss_clip_patches < args["thresh"]] = 0
                 loss_clip_patches = loss_clip_patches.mean()
 
         total_loss = (
-            training_args["lambda_patch"] * loss_patch
-            + training_args["content_weight"] * content_loss
+            args["lambda_patch"] * loss_patch
+            + args["content_weight"] * content_loss
             + reg_tv
-            + training_args["lambda_dir"] * loss_glob
-            + patch_args["lambda_gram"] * loss_gram
-            + patch_args["lambda_clip_patch"] * loss_clip_patches
+            + args["lambda_dir"] * loss_glob
+            + args["lambda_gram"] * loss_gram
+            + args["lambda_clip_patch"] * loss_clip_patches
         )
         total_loss_epoch.append(total_loss)
 
@@ -226,6 +228,9 @@ def run_styleransfer(
             else:
                 print("Clip patch loss", loss_clip_patches.item())
             output_image = target.clone()
+
+    if "padding" in args and args["padding"] > 0:
+        output_image = output_image[..., args["padding"]:-args["padding"], args["padding"]:-args["padding"]]
 
     output_image = adjust_contrast(torch.clamp(output_image, 0, 1).squeeze(), 1.5)
     output_image = transforms.ToPILImage()(output_image.cpu())
@@ -272,28 +277,33 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
         johnny = dependency_parse(content, text_style) if isinstance(text_style, str) else text_style
         print(johnny)
 
-        patch_args_all = config["clipstyler"]["patch_args"]
+        args_all = config["clipstyler"]["args"]
 
-        to_iter = [range(config["data"]["n_trials"]), patch_args_all["patch_size_step"], patch_args_all["lambda_gram"],
-                   patch_args_all["patch_rate"], patch_args_all["lambda_clip_patch"]]
+        args = dict(args_all)
+
+        to_iter = [range(config["data"]["n_trials"]), args_all["patch_size_step"], args_all["lambda_gram"],
+                   args_all["patch_rate"], args_all["lambda_clip_patch"],
+                   args_all["lambda_patch"], args_all["lambda_dir"], args_all["content_weight"]]
 
         for item in itertools.product(*to_iter):
-            trial, (patch_size, patch_step), lambda_gram, patch_rate, lambda_clip_patch = item
-            patch_args = {
-                "patch_size": patch_size,
-                "patch_step": patch_step,
-                "lambda_gram": lambda_gram,
-                "patch_rate": patch_rate,
-                "lambda_clip_patch": lambda_clip_patch
-            }
+            trial, (patch_size, patch_step), lambda_gram, patch_rate, lambda_clip_patch, lambda_patch, lambda_dir, content_weight = item
 
-            print("\nImage:", img_name, "parameters:", patch_args, "\n")
+            args["patch_size"] = patch_size
+            args["patch_step"] = patch_step
+            args["lambda_gram"] = lambda_gram
+            args["patch_rate"] = patch_rate
+            args["lambda_clip_patch"] = lambda_clip_patch
+            args["lambda_patch"] = lambda_patch
+            args["lambda_dir"] = lambda_dir
+            args["content_weight"] = content_weight
+
+            print("\nImage:", img_name, "parameters:", args, "\n")
 
             if config["data"]["use_masks"]:
                 # just so there are no black spots
                 background = "background" if 'background' in text_style else list(text_style.keys())[0]
                 result = run_styleransfer(vgg, content, input_img, text_style[background], johnny, seg_model.CLASSES,
-                                          config["clipstyler"]["args"], patch_args, torch.from_numpy(seg),
+                                          args, torch.from_numpy(seg),
                                           (seg.shape[0], seg.shape[1]), device)
 
                 for part, style in text_style.items():
@@ -303,7 +313,7 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
                         continue
 
                     stylized = run_styleransfer(vgg, content, input_img, style, johnny, seg_model.CLASSES,
-                                                config["clipstyler"]["args"], patch_args, torch.from_numpy(seg),
+                                                args, torch.from_numpy(seg),
                                                 (seg.shape[0], seg.shape[1]), device)
 
                     result[seg == label, :] = stylized[seg == label, :]
@@ -314,15 +324,23 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
                 Image.fromarray(np.uint8(result)).save(os.path.join(out_path, str(trial) + ".jpg"))
             else:
                 stylized = run_styleransfer(vgg, content, input_img, text_style, johnny, seg_model.CLASSES,
-                                            config["clipstyler"]["args"], patch_args, torch.from_numpy(seg),
+                                            args, torch.from_numpy(seg),
                                             (seg.shape[0], seg.shape[1]), device)
 
-                out_path = os.path.join(config["data"]["output"], img_name.split(".")[0] + "_psz_" + str(patch_size) +
-                                        "_pst_" + str(patch_step) + "_lg_" + str(lambda_gram) + "_pr_" + str(patch_rate) +
-                                        "_lcp_" + str(lambda_clip_patch))
-                if not os.path.exists(out_path):
-                    os.mkdir(out_path)
-                Image.fromarray(np.uint8(stylized)).save(os.path.join(out_path, str(trial) + ".jpg"))
+                # out_path = os.path.join(config["data"]["output"], img_name.split(".")[0] + "_psz_" + str(patch_size) +
+                #                         "_pst_" + str(patch_step) + "_lg_" + str(lambda_gram) + "_pr_" + str(patch_rate) +
+                #                         "_lcp_" + str(lambda_clip_patch))
+                # if not os.path.exists(out_path):
+                #     os.mkdir(out_path)
+                # Image.fromarray(np.uint8(stylized)).save(os.path.join(out_path, str(trial) + ".jpg"))
+
+
+                out_file = img_name.split(".")[0] + "_psz_" + str(patch_size) + "_pst_" + str(patch_step) + "_lg_" +\
+                           str(lambda_gram) + "_pr_" + str(patch_rate) + "_lcp_" + str(lambda_clip_patch) + "_lp_" + str(lambda_patch) +\
+                           "_ld_" + str(lambda_dir) + "_cw_" + str(content_weight)
+                # if not os.path.exists(out_path):
+                #     os.mkdir(out_path)
+                Image.fromarray(np.uint8(stylized)).save(os.path.join(config["data"]["output"], out_file + ".jpg"))
 
 
 def main(config):

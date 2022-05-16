@@ -95,24 +95,15 @@ def run_styleransfer(
     if args["lambda_gram"] != 0 or args["lambda_clip_patch"] != 0:
         patches_coords, patches_classes = get_patches_idx(seg, args["patch_size"], args["patch_step"])
 
-        content_img_patches = content_image.unfold(
-            2, args["patch_size"], args["patch_step"]
-        ).unfold(3, args["patch_size"], args["patch_step"])
-
-        patches_content = [content_img_patches[:, :, coords[0], coords[1], :] for coords in patches_coords]
-
     text_features = get_text_feats(clip, clip_model, text, device)
     text_source = get_text_source(clip, clip_model, source, device)
     source_features = get_source_features(clip_model, device, content_image)
 
+    style_weights = [1e3 / n ** 2 for n in [64, 128, 256, 512, 512]]
+
     parts_text_dirs = dict()
     for part, text_part in text_parsed.items():
-        text_features_part = get_text_feats(clip, clip_model, text_part, device)
-
-        text_source_part = get_text_source(clip, clip_model, part, device)
-
-        # print(classes.index(part), text_part)
-        dir_part = text_features_part - text_source_part
+        dir_part = get_text_feats(clip, clip_model, text_part, device) - get_text_source(clip, clip_model, part, device)
 
         dir_part = dir_part / dir_part.norm(dim=-1, keepdim=True)
         parts_text_dirs[classes.index(part)] = dir_part
@@ -166,13 +157,11 @@ def run_styleransfer(
 
             patches_selected = torch.cat(patches_selected, dim=0)
 
-            patches_selected_clone = patches_selected.data.clone()
-            patches_selected_clone.requires_grad = True
-
-            patches_features = get_features(img_normalize(patches_selected, device), vgg,
-                                            layers={'0': 'conv1_1', '5': 'conv2_1', '10': 'conv3_1', '19': 'conv4_1',
-                                                    '28': 'conv5_1'})
-            patches_gram = [GramMatrix()(A) for A in patches_features.values()]
+            if args["lambda_gram"] != 0:
+                patches_features = get_features(img_normalize(patches_selected, device), vgg,
+                                                layers={'0': 'conv1_1', '5': 'conv2_1', '10': 'conv3_1', '19': 'conv4_1',
+                                                        '28': 'conv5_1'})
+                patches_gram = [GramMatrix()(A) for A in patches_features.values()]
 
             text_dirs_patches = []
 
@@ -183,7 +172,7 @@ def run_styleransfer(
 
                 if args["lambda_gram"] != 0:
                     for j in range(i):
-                        loss_gram_patch = sum([nn.MSELoss()(patches_gram[l][i], patches_gram[l][j]) for l in range(len(patches_gram))])
+                        loss_gram_patch = sum([nn.MSELoss()(patches_gram[l][i], patches_gram[l][j]) * style_weights[l] for l in range(len(patches_gram))])
                         if patches_classes[a] == patches_classes[indices[j]]:
                             loss_gram += loss_gram_patch
                         else:
@@ -327,20 +316,12 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
                                             args, torch.from_numpy(seg),
                                             (seg.shape[0], seg.shape[1]), device)
 
-                # out_path = os.path.join(config["data"]["output"], img_name.split(".")[0] + "_psz_" + str(patch_size) +
-                #                         "_pst_" + str(patch_step) + "_lg_" + str(lambda_gram) + "_pr_" + str(patch_rate) +
-                #                         "_lcp_" + str(lambda_clip_patch))
-                # if not os.path.exists(out_path):
-                #     os.mkdir(out_path)
-                # Image.fromarray(np.uint8(stylized)).save(os.path.join(out_path, str(trial) + ".jpg"))
-
-
                 out_file = img_name.split(".")[0] + "_psz_" + str(patch_size) + "_pst_" + str(patch_step) + "_lg_" +\
                            str(lambda_gram) + "_pr_" + str(patch_rate) + "_lcp_" + str(lambda_clip_patch) + "_lp_" + str(lambda_patch) +\
-                           "_ld_" + str(lambda_dir) + "_cw_" + str(content_weight)
-                # if not os.path.exists(out_path):
-                #     os.mkdir(out_path)
-                Image.fromarray(np.uint8(stylized)).save(os.path.join(config["data"]["output"], out_file + ".jpg"))
+                           "_ld_" + str(lambda_dir) + "_cw_" + str(content_weight) + "_" + str(trial)
+                if not os.path.exists(os.path.join(config["data"]["output"], img_name.split(".")[0])):
+                    os.mkdir(os.path.join(config["data"]["output"], img_name.split(".")[0]))
+                Image.fromarray(np.uint8(stylized)).save(os.path.join(config["data"]["output"], img_name.split(".")[0], out_file + ".jpg"))
 
 
 def main(config):

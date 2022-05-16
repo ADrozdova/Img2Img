@@ -1,6 +1,7 @@
 import os
-import warnings
+import argparse
 from collections import namedtuple
+import collections
 
 import numpy as np
 import torch
@@ -15,24 +16,18 @@ from src.datasets import build_text_transform
 from src.loss import GramMSELoss, GramMatrix
 from src.model import build_model
 from src.model.styletransfer_vgg import VGG
-from src.segmentation.evaluation import (build_seg_demo_pipeline)
-from src.utils import get_config, load_checkpoint
-from src.utils import prepare_device, get_seg
-from src.utils.init_models import get_seg_model
-
-warnings.filterwarnings("ignore", category=UserWarning)
-
-# fix random seeds for reproducibility
-SEED = 123
-torch.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(SEED)
+from src.segmentation.evaluation import build_seg_demo_pipeline
+from src.utils import get_config, load_checkpoint, prepare_device, get_seg
+from src.utils.init_models import get_seg_model, get_model_from_cfg
+from src.utils.parse_config import ConfigParser
 
 
-def run_styleransfer(vgg, style_image, content_image, device, img_size):
+def run_styleransfer(vgg, style_image, content_image, device, img_size, max_iter=500):
+    # get network
+
     # pre and post processing for images
     prep = transforms.Compose([transforms.Resize(img_size),
+                               transforms.ColorJitter(brightness=.005, hue=.003),
                                transforms.ToTensor(),
                                transforms.Lambda(lambda x: x[torch.LongTensor([2, 1, 0])]),  # turn to BGR
                                transforms.Normalize(mean=[0.40760392, 0.45795686, 0.48501961],  # subtract imagenet mean
@@ -53,7 +48,6 @@ def run_styleransfer(vgg, style_image, content_image, device, img_size):
     imgs = [Image.open(style_image), Image.open(content_image)]
     imgs_torch = [prep(img).unsqueeze(0).to(device) for img in imgs]
 
-    # imgs_torch = [img.unsqueeze(0).to(device) for img in imgs_torch]
     style_image, content_image = imgs_torch
 
     opt_img = content_image.data.clone()
@@ -78,7 +72,6 @@ def run_styleransfer(vgg, style_image, content_image, device, img_size):
     targets = style_targets + content_targets
 
     # run style transfer
-    max_iter = 500
     show_iter = 50
     optimizer = optim.LBFGS([opt_img])
     n_iter = [0]
@@ -103,75 +96,82 @@ def run_styleransfer(vgg, style_image, content_image, device, img_size):
     return np.asarray(out_img)
 
 
-def inference(cfg, model, test_pipeline, text_transform, dataset, input_img, output_file, part_to_style, vgg_path,
-              device):
-    seg_model = get_seg_model(cfg, model, text_transform, dataset, list(part_to_style.keys()))
-    seg = get_seg(seg_model, test_pipeline, input_img)
+def inference(cfg, model, test_pipeline, text_transform, device):
+    img_names = config["data"]["image_path"]
+    if isinstance(img_names, str):
+        img_names = [img_names]
+    texts_all = config["styletransfer"]["texts"]
 
-    # get network
+    if isinstance(texts_all, str):
+        texts_all = [texts_all]
+
+    all_words = []
+
+    for text in texts_all:
+        if isinstance(text, collections.OrderedDict):
+            all_words.extend(list(text.keys()))
+        else:
+            all_words.extend(text.split())
+
+    seg_model = get_seg_model(
+        cfg, model, text_transform, config["groupvit"]["dataset"], all_words
+    )
     vgg = VGG()
-    vgg.load_state_dict(torch.load(vgg_path))
+    vgg.load_state_dict(torch.load(config["styletransfer"]["vgg_path"]))
     for param in vgg.parameters():
         param.requires_grad = False
 
     vgg = vgg.to(device)
-    # result = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
 
-    # background (to include unlabeled pixels)
-    result = run_styleransfer(vgg, part_to_style['background'], input_img, device, (seg.shape[0], seg.shape[1]))
+    for img_name, part_to_style in zip(img_names, texts_all):
+        input_img = os.path.join(config["data"]["input"], img_name)
+        seg = get_seg(seg_model, test_pipeline, input_img)
 
-    for part, style_image in part_to_style.items():
-        if part == "background":
-            continue
+        for trial in range(config["data"]["n_trials"]):
+            # background (to include unlabeled pixels)
+            background = "background" if 'background' in part_to_style else list(part_to_style.keys())[0]
+            result = run_styleransfer(vgg, part_to_style[background], input_img, device, (seg.shape[0], seg.shape[1]))
 
-        label = seg_model.CLASSES.index(part)
+            for part, style_image in part_to_style.items():
+                if part == background:
+                    continue
 
-        if len(result[seg == label, :]) == 0:  # class not found
-            continue
+                label = seg_model.CLASSES.index(part)
 
-        stylized = run_styleransfer(vgg, style_image, input_img, device, (seg.shape[0], seg.shape[1]))
+                if len(result[seg == label, :]) == 0:  # class not found
+                    continue
 
-        result[seg == label, :] = stylized[seg == label, :]
+                stylized = run_styleransfer(vgg, style_image, input_img, device, (seg.shape[0], seg.shape[1]))
 
-    img_result = Image.fromarray(np.uint8(result))
-    img_result.save(output_file)
+                result[seg == label, :] = stylized[seg == label, :]
+
+            out_file = img_name.split(".")[0] + "_" + str(trial) + ".jpg"
+            if not os.path.exists(os.path.join(config["data"]["output"], img_name.split(".")[0])):
+                os.mkdir(os.path.join(config["data"]["output"], img_name.split(".")[0]))
+
+            Image.fromarray(np.uint8(result)).save(os.path.join(config["data"]["output"], img_name.split(".")[0], out_file))
 
 
-def main(local_rank):
-    checkpoint_url = 'https://github.com/xvjiarui/GroupViT/releases/download/v1.0.0/group_vit_gcc_yfcc_30e-74d335e6.pth'
-    cfg_path = 'src/configs/group_vit_gcc_yfcc_30e.yml'
-    vis_modes = ['input_pred_label', 'final_group']
-
-    PSEUDO_ARGS = namedtuple('PSEUDO_ARGS',
-                             ['cfg', 'opts', 'resume', 'vis', 'local_rank'])
-
-    args = PSEUDO_ARGS(
-        cfg=cfg_path, opts=[], resume=checkpoint_url, vis=vis_modes, local_rank=0)
-
-    cfg = get_config(args)
-
-    with read_write(cfg):
-        cfg.evaluate.eval_only = True
-
-    device = prepare_device(local_rank)
+def main(config):
+    device = prepare_device(config.local_rank)
     torch.distributed.init_process_group(backend="nccl")
 
-    model = build_model(cfg.model)
-    model = revert_sync_batchnorm(model)
-    model.to(device)
-    model.eval()
+    model, cfg = get_model_from_cfg(config, device)
 
-    load_checkpoint(cfg, model, None, None)
-
-    text_transform = build_text_transform(False, cfg.data.text_aug, with_dc=False)
-    test_pipeline = build_seg_demo_pipeline()
-
-    part_to_style = {"background": "styles/blue_swirls.jpg", "crab": "styles/patterned_leaves.jpg"}
-
-    inference(cfg, model, test_pipeline, text_transform, 'voc', './test_dataset/30.jpg',
-              "group_styletransfer_output.jpg", part_to_style, "vgg_conv.pth",
-              device)
+    inference(cfg, model, build_seg_demo_pipeline(), build_text_transform(False, cfg.data.text_aug, with_dc=False), device)
 
 
 if __name__ == "__main__":
-    main(int(os.environ["LOCAL_RANK"]))
+    args = argparse.ArgumentParser(description="PyTorch Template")
+    args.add_argument(
+        "-c",
+        "--config",
+        default=None,
+        type=str,
+        help="config file path (default: None)",
+    )
+
+    config = ConfigParser.from_args(
+        args, [], local_rank=int(os.environ["LOCAL_RANK"])
+    )
+    main(config)

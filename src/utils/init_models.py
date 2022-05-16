@@ -6,7 +6,6 @@ import torch
 from mmcv.cnn.utils import revert_sync_batchnorm
 from omegaconf import read_write
 
-import src.model as module_arch
 
 from src.segmentation.datasets import (COCOObjectDataset, PascalContextDataset,
                                        PascalVOCDataset)
@@ -15,6 +14,7 @@ from src.utils import get_config, load_checkpoint
 
 
 def init_gen(config, device, local_rank):
+    import src.model as module_arch
     logger = config.get_logger("train")
     gen_B = config.init_obj(config["generator"], module_arch)
     gen_A = config.init_obj(config["generator"], module_arch)
@@ -36,6 +36,7 @@ def init_gen(config, device, local_rank):
 
 
 def init_disc(config, device, local_rank):
+    import src.model as module_arch
     logger = config.get_logger("train")
     disc_A = config.init_obj(config["discriminator"], module_arch)
     disc_B = config.init_obj(config["discriminator"], module_arch)

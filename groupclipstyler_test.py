@@ -66,8 +66,8 @@ def run_styleransfer(
     content_image = content_image.to(device)
 
     if "padding" in args and args["padding"] > 0:
-        content_image = transforms.Pad(padding = args["padding"])(content_image)
-        seg = transforms.Pad(padding=args["padding"])(seg)
+        content_image = transforms.Pad(padding = args["padding"], padding_mode='reflect')(content_image)
+        seg = transforms.Pad(padding=args["padding"], padding_mode='reflect')(seg)
 
     content_features = get_features(img_normalize(content_image, device), vgg)
 
@@ -90,13 +90,19 @@ def run_styleransfer(
 
     clip_model, preprocess = clip.load("ViT-B/32", device, jit=False)
 
-
-
     if args["lambda_gram"] != 0 or args["lambda_clip_patch"] != 0:
         patches_coords, patches_classes = get_patches_idx(seg, args["patch_size"], args["patch_step"])
 
+    if args["mix_dirs"]:
+        seg = torch.unsqueeze(seg, 0).repeat(3, 1, 1)
+        seg = torch.unsqueeze(seg, 0)  # shape 1, 3, H, W
+        seg = seg.to(device)
+
     text_features = get_text_feats(clip, clip_model, text, device)
     text_source = get_text_source(clip, clip_model, source, device)
+
+    text_direction_glob = text_features - text_source
+
     source_features = get_source_features(clip_model, device, content_image)
 
     style_weights = [1e3 / n ** 2 for n in [64, 128, 256, 512, 512]]
@@ -118,10 +124,44 @@ def run_styleransfer(
         content_loss = torch.mean((target_features["conv4_2"] - content_features["conv4_2"]) ** 2)
         content_loss += torch.mean((target_features["conv5_2"] - content_features["conv5_2"]) ** 2)
 
-        img_aug = torch.cat([augment(cropper(target)) for _ in range(args["num_crops"])], dim=0)
+        #####
+        if args["mix_dirs"]:
+            target_seg = torch.cat([target, seg], dim=0)
+            img_crops = []
+            seg_crops = []
+
+            for _ in range(args["num_crops"]):
+                crop = cropper(target_seg)
+                img_crops.append(augment(crop[0:1, ...]))
+                seg_crops.append(crop[1, 0, ...])
+
+            img_aug = torch.cat(img_crops, dim=0)
+
+        else:
+            img_aug = torch.cat([augment(cropper(target)) for _ in range(args["num_crops"])], dim=0)
+        #####
 
         img_direction = img_dir(img_aug, source_features, clip_model, device)
-        text_direction = (text_features - text_source).repeat(img_aug.size(0), 1)
+
+        #####
+        if args["mix_dirs"]:
+            total_pixels = seg_crops[0].numel()
+            text_direction = []
+
+            for i in range(len(seg_crops)):
+                text_dir_patch = 0
+                for party in torch.unique(seg_crops[i]):
+                    if party.item() in parts_text_dirs:
+                        pixels = (seg_crops[i] == party.item()).sum().item()
+                        text_dir_patch += (pixels / total_pixels) * parts_text_dirs[party.item()]
+                if isinstance(text_dir_patch, int):
+                    text_dir_patch = text_direction_glob
+                text_direction.append(text_dir_patch)
+            text_direction = torch.cat(text_direction, dim=0)
+        else:
+            text_direction = (text_features - text_source).repeat(img_aug.size(0), 1)
+        #####
+
         text_direction /= text_direction.norm(dim=-1, keepdim=True)
         loss_temp = 1 - torch.cosine_similarity(img_direction, text_direction, dim=1)
         loss_temp[loss_temp < args["thresh"]] = 0
@@ -134,7 +174,7 @@ def run_styleransfer(
         glob_direction = glob_features - source_features
         glob_direction /= glob_direction.clone().norm(dim=-1, keepdim=True)
 
-        loss_glob = (1 - torch.cosine_similarity(glob_direction, text_direction, dim=1)).mean()
+        loss_glob = (1 - torch.cosine_similarity(glob_direction, text_direction_glob, dim=1)).mean()
 
         reg_tv = args["lambda_tv"] * get_image_prior_losses(target)
 
@@ -286,7 +326,7 @@ def inference(cfg, model, test_pipeline, text_transform, config, device):
             args["lambda_dir"] = lambda_dir
             args["content_weight"] = content_weight
 
-            print("\nImage:", img_name, "parameters:", args, "\n")
+            print("\nImage:", img_name) #, "parameters:", args, "\n")
 
             if config["data"]["use_masks"]:
                 # just so there are no black spots

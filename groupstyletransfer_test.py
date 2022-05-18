@@ -107,6 +107,16 @@ def inference(cfg, model, test_pipeline, text_transform, device):
 
     all_words = []
 
+    img_cnt = int(len(img_names) / 6)
+
+    idx_start = img_cnt * config.local_rank
+    idx_end = img_cnt * (config.local_rank + 1) if config.local_rank < 5 else len(img_names)
+
+    img_names = img_names[idx_start:idx_end]
+    texts_all = texts_all[idx_start:idx_end]
+
+    print(img_names, len(img_names), len(texts_all))
+
     for text in texts_all:
         if isinstance(text, collections.OrderedDict):
             all_words.extend(list(text.keys()))

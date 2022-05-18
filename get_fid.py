@@ -55,7 +55,6 @@ def run_fid(base, paths, seg_file, parts_idx_path, styles, num_workers=None, dev
         style = styles[1 - i]
 
         out_dir_base = os.path.join(base, style, str(part))
-        # print("out_dir_base", out_dir_base)
         added_dirs.append(out_dir_base)
         if not os.path.exists(out_dir_base):
             os.mkdir(out_dir_base)
@@ -63,7 +62,6 @@ def run_fid(base, paths, seg_file, parts_idx_path, styles, num_workers=None, dev
         mask_images(os.path.join(base, style), seg_npy, parts_idx[part], out_dir_base)
 
         out_dir_paths = os.path.join(paths, str(part))
-        # print("out_dir_paths", out_dir_paths)
         added_dirs.append(out_dir_paths)
         if not os.path.exists(out_dir_paths):
             os.mkdir(out_dir_paths)
@@ -75,8 +73,7 @@ def run_fid(base, paths, seg_file, parts_idx_path, styles, num_workers=None, dev
                                               device,
                                               dims,
                                               num_workers))
-        # print("\ndirs:", part, fid_value, "\n")
-    # print(added_dirs)
+
     for added in added_dirs:
         shutil.rmtree(added)
     return np.mean(fids)

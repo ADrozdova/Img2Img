@@ -12,9 +12,11 @@ from src.segmentation.evaluation import build_seg_demo_pipeline
 from src.utils import prepare_device, get_seg
 from src.utils.init_models import get_seg_model, get_model_from_cfg
 from src.utils.parse_config import ConfigParser
+import shutil
 
 
 def run_seg(cfg, model, test_pipeline, text_transform, config, device):
+    # img_names = os.listdir(config["data"]["input"])
     img_names = config["data"]["image_path"]
     if isinstance(img_names, str):
         img_names = [img_names]
@@ -24,9 +26,6 @@ def run_seg(cfg, model, test_pipeline, text_transform, config, device):
         texts_all = [texts_all]
 
     all_words = []
-
-    img_names = [img_names[config.local_rank]]
-    texts_all = [texts_all[config.local_rank]]
 
     for text in texts_all:
         if isinstance(text, collections.OrderedDict):
@@ -38,7 +37,10 @@ def run_seg(cfg, model, test_pipeline, text_transform, config, device):
         cfg, model, text_transform, config["groupvit"]["dataset"], all_words
     )
 
+    text_style = config["clipstyler"]["args"]["texts"]
+
     for img_name, text_style in zip(img_names, texts_all):
+    # for img_name in img_names:
         input_img = os.path.join(config["data"]["input"], img_name)
         seg = get_seg(seg_model, test_pipeline, input_img)
 
@@ -48,10 +50,14 @@ def run_seg(cfg, model, test_pipeline, text_transform, config, device):
                 if len(seg[seg == seg_model.CLASSES.index(word)]) > 0:
                     parts_idx[word] = seg_model.CLASSES.index(word)
 
-        np.save(os.path.join(config["data"]["output"], img_name.split(".")[0] + "_seg" + ".npy"), seg)
-        pickle_file = os.path.join(config["data"]["output"], img_name.split(".")[0] + "_parts_idx" + ".pickle")
-        with open(pickle_file, 'wb') as handle:
-            pickle.dump(parts_idx, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        if len(parts_idx) >= 2:
+            np.save(os.path.join(config["data"]["output"], img_name.split(".")[0] + "_seg" + ".npy"), seg)
+            pickle_file = os.path.join(config["data"]["output"], img_name.split(".")[0] + "_parts_idx" + ".pickle")
+            with open(pickle_file, 'wb') as handle:
+                pickle.dump(parts_idx, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        if len(parts_idx) < 2:
+            print(img_name, parts_idx)
+            os.remove(input_img)
 
 
 def main(config):

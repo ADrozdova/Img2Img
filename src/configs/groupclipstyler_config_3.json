@@ -1,0 +1,44 @@
+{
+  "name": "group clipstyler config mixing text dirs (best params)",
+  "data": {
+    "input": "test_dataset_resized",
+    "image_path": ["18.jpg", "45.jpg", "28.jpg", "40.jpeg", "39.jpg", "46.jpg"],
+    "output": "outs_3/",
+    "n_trials": 1,
+    "use_masks": false
+  },
+  "clipstyler": {
+    "args": {
+      "lambda_tv": 2e-3,
+      "lambda_patch": [10000],
+      "lambda_dir": [500],
+      "content_weight": [250],
+      "crop_size": 64,
+      "num_crops": 128,
+      "max_step": 100,
+      "lr": 5e-4,
+      "thresh": 0.5,
+      "get_content": true,
+      "mix_dirs": true,
+      "texts": ["person to sketch with black pencil, background starry night by van gogh",
+        "dog to The Great Wave off Kanagawa by Hokusai, plant to Starry Night by van Gogh, background to Wheatfield by Vincent van gogh",
+        "goat to sketch with black pencil, background to Impression Sunrise by Claude Monet",
+        "church to The great wave off kanasava by Hokusai. background to The Kiss by Klimt",
+        "boat to The Kiss by Klimt. background to The Birth of Venus by Sandro Botticelli",
+        "stick to Impression Sunrise by Claude Monet, sea to Starry Night by van Gogh"
+        ],
+      "patch_size_step": [[0, 0]],
+      "lambda_gram": [0],
+      "patch_rate": [0],
+      "lambda_clip_patch": [0],
+      "padding": 32
+    }
+  },
+  "groupvit": {
+    "checkpoint_url": "https://github.com/xvjiarui/GroupViT/releases/download/v1.0.0/group_vit_gcc_yfcc_30e-74d335e6.pth",
+    "cfg_path": "src/configs/group_vit_gcc_yfcc_30e.yml",
+    "vis_modes": ["input_pred_label", "final_group"],
+    "dataset": "context"
+  }
+}
+

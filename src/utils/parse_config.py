@@ -25,18 +25,21 @@ class ConfigParser:
         self.resume = resume
 
         # set save_dir where trained model and log will be saved.
-        save_dir = Path(self.config["trainer"]["save_dir"])
 
-        exper_name = self.config["name"]
-        if run_id is None:  # use timestamp as default run-id
-            run_id = datetime.now().strftime(r"%m%d_%H%M%S%f")
-        self._save_dir = save_dir / "models" / exper_name / run_id
-        self._log_dir = save_dir / "log" / exper_name / run_id
+        if "trainer" in self.config and "save_dir" in self.config["trainer"]:
+            save_dir = Path(self.config["trainer"]["save_dir"])
+            exper_name = self.config["name"]
+            if run_id is None:  # use timestamp as default run-id
+                run_id = datetime.now().strftime(r"%m%d_%H%M%S%f")
+            self._save_dir = save_dir / "models" / exper_name / run_id
+            self._log_dir = save_dir / "log" / exper_name / run_id
+        else:
+            save_dir = None
 
         # make directory for saving checkpoints and log.
         exist_ok = run_id == ""
 
-        if local_rank == 0:
+        if local_rank == 0 and save_dir:
             self.save_dir.mkdir(parents=True, exist_ok=exist_ok)
             self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
 
@@ -58,9 +61,9 @@ class ConfigParser:
             args.add_argument(*opt.flags, default=None, type=opt.type)
         if not isinstance(args, tuple):
             args = args.parse_args()
-        if args.device is not None:
+        if hasattr(args,'device') and args.device is not None:
             os.environ["CUDA_VISIBLE_DEVICES"] = args.device
-        if args.resume is not None:
+        if hasattr(args,'resume') and args.resume is not None:
             resume = Path(args.resume)
             cfg_fname = resume.parent / "checkpoint_config.json"
         else:

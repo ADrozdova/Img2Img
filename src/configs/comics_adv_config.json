@@ -1,0 +1,72 @@
+{
+  "name": "comics adv config",
+  "n_gpu": 1,
+  "preprocessing": {
+  },
+  "generator": {
+    "type": "Generator",
+    "args": {
+      "in_size": 3,
+      "n_filter": 64,
+      "n_blocks": 9,
+      "enc_kernels": [7, 3, 3],
+      "enc_stride": 1,
+      "enc_padding": [0, 1, 1],
+      "dec_kernels": [3, 3],
+      "dec_stride": 2,
+      "dec_padding": [1, 1]
+    }
+  },
+  "discriminator": {
+    "type": "Discriminator",
+    "args": {
+      "channels": [3, 64, 128, 256, 512],
+      "kernel_sz": 4,
+      "padding": 1
+    }
+  },
+  "dataset": {
+    "img_folder": "/Vol1/dbstore/MDAL/HSE/comics_split",
+    "url": "",
+    "parts_train": ["train/face", "train/comics"],
+    "parts_val": ["val/face", "val/comics"],
+    "batch_size_train": 2,
+    "batch_size_val": 16,
+    "valid_rate": 0.8,
+    "resize": 128,
+    "ddp_val": true,
+    "num_workers_train": 0,
+    "num_workers_val": 0
+  },
+  "optimizer_gen": {
+    "type": "Adam",
+    "args": {
+      "lr": 4e-5,
+      "betas": [0.9, 0.999]
+    }
+  },
+  "optimizer_disc": {
+    "type": "Adam",
+    "args": {
+      "lr": 4e-3,
+      "betas": [0.9, 0.999]
+    }
+  },
+  "loss": {
+    "type": "CycleGanLoss",
+    "args": {
+      "types": ["cycle", "adversarial"],
+      "discr_loss_coef": 0.5
+    },
+    "lambda_cyc": 15.0
+  },
+  "trainer": {
+    "epochs": 100,
+    "save_dir": "saved/",
+    "save_period": 1,
+    "verbosity": 2,
+    "log_step": 10,
+    "early_stop": 100,
+    "visualize": "tensorboard"
+  }
+}
